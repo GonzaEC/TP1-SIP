@@ -39,6 +39,7 @@ El sitio elegido presenta los desafíos clásicos del scraping moderno: contenid
 | Selenium Manager | (incluido en Selenium 4) | Descarga automática de chromedriver / geckodriver |
 | Maven | 3.x | Build y gestión de dependencias |
 | Chrome / Firefox | latest | Navegadores objetivo |
+| JaCoCo | 0.8.12+ | mide la cobertura de código
 
 ---
 
@@ -51,7 +52,27 @@ TP1-SIP/
 ├── HIT3/   → Filtros por DOM + Screenshot
 ├── HIT4/   → (próximamente)
 ├── HIT5/   → (próximamente)
-├── HIT6/   → (próximamente)
+├── HIT6/
+│   ├── pom.xml
+│   ├── src
+│   ├── main
+│   │   └── java
+│   │       └── ar
+│   │           └── edu
+│   │               └── sip
+│   │                   ├── BrowserFactory.java
+│   │                   ├── MercadoLibreScraper.java
+│   │                   ├── ProductResult.java
+│   │                   └── Selectors.java
+│   └── test
+│       └── java
+│           └── ar
+│               └── edu
+│                   └── sip
+│                       ├── BrowserFactoryTest.java
+│                       ├── MercadoLibreScrapperTest.java
+│                       ├── ProductResultSchemaTest.java
+│                       └── ScrapperE2ETest.java
 ├── HIT7/   → (próximamente)
 └── HIT8/   → (próximamente)
 ```
@@ -111,19 +132,25 @@ mvn compile exec:java -Dbrowser=firefox
 
 ### HIT 6 — Modo Headless
 **Carpeta:** `HIT6/`
-Se ejecuta un set de tests automatizados (`JUnit`) que validan Que:
+Se ejecuta un set de tests automatizados (`JUnit` + `Mockito`) que validan que:
 * Scraper extrae al menos 10 resultados por producto.
 * El JSON generado cumple un schema mínimo (todos los campos requeridos, tipos correctos).
 * Los precios extraídos son números positivos.
 * Todos los links son URLs absolutas válidas.
 
-Los tests deben correr en CI tanto en Chrome como en Firefox.
+Los tests corren en CI tanto en Chrome como en Firefox.
 
-Cobertura mínima: 70 %. Configure el reporte de cobertura (coverage.py + pytest-cov, jest --coverage, jacoco) y agregue una etapa al pipeline de CI que falle si la cobertura cae debajo del 70 %. Publique el reporte HTML como artifact del workflow.
+Se configuro el reporte de cobertura (`jacoco`) en una etapa al pipeline de CI que falle si la cobertura cae debajo del 70 %. En cuyo caso, se publique el reporte HTML como artifact del workflow.
 
+Se dispone de dos capas separadas de test:
+* **Unitarios** (`MercadoLibreScraperTest`) usa Mockito para simular el `WebDriver` y los `WebElements`. No abren ningún browser. Validan la lógica de `extraerDatos`, `tryGetText`, `tryGetLong` y `sanitizar` de forma rápida y determinista.
 ```bash
-cd HIT6
+cd HIT6/
 mvn test
+```
+* **E2E** (`ScraperE2ETest`) levanta un Chrome real contra mercadolibre.com.ar. Solo corren cuando `INTEGRATION=true`. Valida el sistema completo contra datos reales. El `@BeforeAll` navega y deja el driver posicionado en la página de resultados; los 4 tests luego llaman a extraerDatos sobre ese estado compartido.
+```bash
+cd HIT6/
 INTEGRATION=true mvn test
 ```
 ---
