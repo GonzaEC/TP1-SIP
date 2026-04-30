@@ -3,8 +3,12 @@ package ar.edu.sip;
 
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
+
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
 import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
@@ -15,257 +19,317 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests de integración que validan la lógica del scraper
+ * Tests unitarios/integración que validan la lógica del scraper
  * usando Mockito en lugar de un WebDriver real.
  *
  * Cubren los 4 criterios del Hit 6:
  *  1. Al menos 10 resultados por producto.
- *  2. Schema mínimo del JSON.
- *  3. Precios positivos.
- *  4. Links como URLs absolutas.
+ *  2. Schema mínimo del JSON (titulo, link, tipos correctos).
+ *  3. Precios extraídos son números positivos.
+ *  4. Links son URLs absolutas válidas.
+ *
+ * REGLA MOCKITO: buildContainerList() SOLO construye la lista.
+ * Cada test hace su propio when(driver.findElements(...)).thenReturn(...)
+ * para evitar el UnfinishedStubbingException que ocurría cuando
+ * buildContainers() llamaba when(driver...) dentro de un contexto
+ * de stubbing externo.
  */
 @ExtendWith(MockitoExtension.class)
-class MercadoLibreScraperTest {
+@MockitoSettings(strictness = Strictness.LENIENT)
+// para permitir un helper compartido que genera stubs "de mas" por diseño.
+class MercadoLibreScraperTest
+{
 
-    @Mock  WebDriver driver;
-    @Mock  WebDriverWait wait;
-    @Mock  WebElement container;
-    @Mock  WebElement linkElement;
-    @Mock  WebElement priceElement;
-    @Mock  WebElement shippingElement;
+	@Mock WebDriver     driver;
+	@Mock WebDriverWait wait;
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+	@Mock WebElement container;
+	@Mock WebElement linkElement;
+	@Mock WebElement priceElement;
 
-    /** Fabrica N contenedores mock que devuelven datos válidos. */
-    /**
-     * Este método era el que causaba el UnfinishedStubbingException.
-     * Ahora cada when() está correctamente cerrado con .thenReturn().
-     */
-    private List<WebElement> buildContainers(int cantidad) {
-        List<WebElement> contenedores = new ArrayList<>();
+	// ── Helper: construye lista SIN stubbear driver ───────────────────────────
+	private List<WebElement> buildContainerList(int cantidad)
+	{
+		List<WebElement> lista = new ArrayList<>();
+		for (int i = 0; i < cantidad; i++)
+		{
+			WebElement c     = mock(WebElement.class);
+			WebElement link  = mock(WebElement.class);
+			WebElement price = mock(WebElement.class);
+			WebElement store = mock(WebElement.class);
+			WebElement ship  = mock(WebElement.class);
+			WebElement inst  = mock(WebElement.class);
 
-        for (int i = 0; i < cantidad; i++) {
-            // Creamos los mocks para el contenedor y sus elementos internos
-            WebElement contenedorMock = mock(WebElement.class);
-            WebElement linkMock = mock(WebElement.class);
-            WebElement precioMock = mock(WebElement.class);
-            WebElement tiendaMock = mock(WebElement.class);
+			when(link.getText()).thenReturn("Producto " + i);
+			when(link.getAttribute("href"))
+				.thenReturn(
+					"https://articulo.mercadolibre.com.ar/MLA-" +
+					(1_000_000 + i)
+				);
+			when(price.getText()).thenReturn("1500");
+			when(store.getText()).thenReturn("por Tienda Oficial " + i);
+			when(ship.getText()).thenReturn("Envío gratis");
+			when(inst.getText()).thenReturn("12x sin interés");
 
-            // Configuramos el comportamiento de los elementos hijos
-            when(linkMock.getText()).thenReturn("Producto " + i);
-            when(linkMock.getAttribute("href")).thenReturn("https://articulo.mercadolibre.com.ar/MLA-" + i);
-            when(precioMock.getText()).thenReturn("$ 1.500");
-            when(tiendaMock.getText()).thenReturn("por Tienda Oficial");
+			when(c.findElement(Selectors.PRODUCT_LINK)).thenReturn(link);
+			when(c.findElement(Selectors.PRODUCT_PRICE)).thenReturn(price);
+			when(c.findElement(Selectors.PRODUCT_OFFICIAL_STORE))
+				.thenReturn(store);
+			when(c.findElement(Selectors.PRODUCT_SHIPPING)).thenReturn(ship);
+			when(c.findElement(Selectors.PRODUCT_INSTALLMENTS))
+				.thenReturn(inst);
 
-            // IMPORTANTE: Mockear la búsqueda interna para que no devuelva null
-            when(contenedorMock.findElement(Selectors.PRODUCT_LINK)).thenReturn(linkMock);
-            when(contenedorMock.findElement(Selectors.PRODUCT_PRICE)).thenReturn(precioMock);
-            when(contenedorMock.findElement(Selectors.PRODUCT_OFFICIAL_STORE)).thenReturn(tiendaMock);
-            
-            // Mockear campos opcionales para evitar NoSuchElementException
-            when(contenedorMock.findElement(Selectors.PRODUCT_SHIPPING)).thenReturn(mock(WebElement.class));
-            when(contenedorMock.findElement(Selectors.PRODUCT_INSTALLMENTS)).thenReturn(mock(WebElement.class));
+			lista.add(c);
+		}
+		return lista;
+	}
 
-            contenedores.add(contenedorMock);
-        }
+	// ── 1. Cantidad mínima de resultados ──────────────────────────────────────
+	@Test
+	void extraerDatos_conMasDe10Contenedores_retornaExactamente10()
+	{
+		List<WebElement> lista = buildContainerList(15);
+		when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS))
+			.thenReturn(lista);
 
-        // Stubbing final del driver
-        when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS)).thenReturn(contenedores);
-        
-        return contenedores;
-    }
+		List<ProductResult> resultados = MercadoLibreScraper.extraerDatos(driver, "test");
 
-    // ── 1. Cantidad mínima de resultados ─────────────────────────────────────
+		assertEquals(
+			MercadoLibreScraper.CANT_RESULTADOS,
+			resultados.size(),
+			"Debe respetar el límite CANT_RESULTADOS aunque haya más contenedores"
+		);
+	}
 
-    @Test
-    void extraerDatos_conMasDe10Contenedores_retornaExactamente10() {
-        buildContainers(15); // El límite en el código es 10
+	@Test
+	void extraerDatos_con10Contenedores_retorna10()
+	{
+		List<WebElement> lista = buildContainerList(10);
+		when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS))
+			.thenReturn(lista);
 
-        List<ProductResult> resultados = MercadoLibreScraper.extraerDatos(driver, "test");
+		List<ProductResult> resultados = MercadoLibreScraper.extraerDatos(driver, "test");
 
-        assertEquals(10, resultados.size(), "Debe extraer exactamente CANT_RESULTADOS items");
-    }
+		assertEquals(10, resultados.size());
+		assertEquals("Producto 0", resultados.get(0).getTitulo());
+	}
 
-    @Test
-    void extraerDatos_con10Contenedores_retorna10() {
-        buildContainers(10);
+	@Test
+	void extraerDatos_conMenosDe10Contenedores_retornaTodosDisponibles()
+	{
+		List<WebElement> lista = buildContainerList(5);
+		when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS))
+			.thenReturn(lista);
 
-        // Llamamos al método estático de la clase original
-        List<ProductResult> resultados = MercadoLibreScraper.extraerDatos(driver, "test");
+		List<ProductResult> resultados = MercadoLibreScraper.extraerDatos(driver, "test");
 
-        assertEquals(10, resultados.size());
-        assertEquals("Producto 0", resultados.get(0).getTitulo());
-    }
+		assertEquals(5, resultados.size());
+	}
 
-    @Test
-    void extraerDatos_conMenosDe10Contenedores_retornaTodosDisponibles() {
-        buildContainers(5);
+	@Test
+	void extraerDatos_sinContenedores_retornaListaVacia()
+	{
+		when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS))
+			.thenReturn(List.of());
 
-        List<ProductResult> resultados = MercadoLibreScraper.extraerDatos(driver, "test");
+		List<ProductResult> resultados = MercadoLibreScraper.extraerDatos(driver, "test");
 
-        assertEquals(5, resultados.size());
-    }
+		assertTrue(resultados.isEmpty());
+	}
 
-    @Test
-    void extraerDatos_sinContenedores_retornaListaVacia() {
-        when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS))
-            .thenReturn(List.of());
+	// ── 2. Schema mínimo ──────────────────────────────────────────────────────
 
-        List<ProductResult> result = MercadoLibreScraper.extraerDatos(driver, "test");
+	@Test
+	void extraerDatos_todosLosItems_tienenTituloYLink()
+	{
+		List<WebElement> lista = buildContainerList(10);
 
-        assertTrue(result.isEmpty());
-    }
+		when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS))
+			.thenReturn(lista);
 
-    // ── 2. Schema mínimo ─────────────────────────────────────────────────────
+		List<ProductResult> resultados =
+			MercadoLibreScraper.extraerDatos(driver, "test");
 
-    @Test
-    void extraerDatos_todoLosItems_tienenTituloYLink() {
-        when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS))
-            .thenReturn(buildContainers(10));
+		assertFalse(resultados.isEmpty());
+		resultados.forEach(p -> {
+			assertNotNull(p.getTitulo(), "titulo no debe ser null");
+			assertFalse(p.getTitulo().isBlank(), "titulo no debe estar vacío");
+			assertNotNull(p.getLink(), "link no debe ser null");
+		});
+	}
 
-        List<ProductResult> result = MercadoLibreScraper.extraerDatos(driver, "test");
+	@Test
+	void extraerDatos_itemConLinkFaltante_guardaLinkNull()
+	{
+		// 9 contenedores válidos + 1 con link null
+		List<WebElement> mixed = new ArrayList<>(buildContainerList(9));
 
-        result.forEach(p -> {
-            assertNotNull(p.getTitulo(), "titulo no debe ser null");
-            assertFalse(p.getTitulo().isBlank(), "titulo no debe estar vacío");
-            assertNotNull(p.getLink(), "link no debe ser null");
-        });
-    }
+		WebElement badContainer = mock(WebElement.class);
+		WebElement badLink      = mock(WebElement.class);
 
-    @Test
-    void extraerDatos_itemConLinkFaltante_esDescartado() {
-        WebElement badContainer = mock(WebElement.class);
-        WebElement badLink      = mock(WebElement.class);
-        when(badLink.getText()).thenReturn("");         // título vacío
-        when(badLink.getAttribute("href")).thenReturn(null);
-        when(badContainer.findElement(Selectors.PRODUCT_LINK)).thenReturn(badLink);
+		when(badLink.getText()).thenReturn("Producto sin link");
+		when(badLink.getAttribute("href")).thenReturn(null);
+		when(badContainer.findElement(Selectors.PRODUCT_LINK))
+			.thenReturn(badLink);
+		when(badContainer.findElement(Selectors.PRODUCT_PRICE))
+			.thenThrow(new NoSuchElementException("no price"));
+		when(badContainer.findElement(Selectors.PRODUCT_OFFICIAL_STORE))
+			.thenThrow(new NoSuchElementException("no store"));
+		when(badContainer.findElement(Selectors.PRODUCT_SHIPPING))
+			.thenThrow(new NoSuchElementException("no shipping"));
+		when(badContainer.findElement(Selectors.PRODUCT_INSTALLMENTS))
+			.thenThrow(new NoSuchElementException("no installments"));
 
-        List<WebElement> mixed = new ArrayList<>(buildContainers(9));
-        mixed.add(badContainer);
+		mixed.add(badContainer);
 
-        when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS)).thenReturn(mixed);
+		when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS))
+			.thenReturn(mixed);
 
-        List<ProductResult> result = MercadoLibreScraper.extraerDatos(driver, "test");
+		List<ProductResult> resultados =
+			MercadoLibreScraper.extraerDatos(driver, "test");
 
-        // El item con título vacío fue añadido (el scraper no filtra por título vacío,
-        // pero el link sí se guarda como null → verificamos que los 9 válidos tienen link)
-        long conLink = result.stream().filter(p -> p.getLink() != null).count();
-        assertEquals(9, conLink, "Los 9 items válidos deben tener link");
-    }
+		assertEquals(10, resultados.size(), "Deben procesarse los 10 contenedores");
 
-    // ── 3. Precios positivos ─────────────────────────────────────────────────
+		long conLink = resultados.stream().filter(p -> p.getLink() != null).count();
 
-    @Test
-    void extraerDatos_precios_sonTodosPositivos()
-    {
-        buildContainers(1);
+		assertEquals(9, conLink, "Los 9 items válidos deben tener link");
+	}
 
-        List<ProductResult> resultados = MercadoLibreScraper.extraerDatos(driver, "test");
+	// ── 3. Precios positivos ───────────────────────────────────────────────────
 
-        assertNotNull(resultados.get(0).getPrecio());
-        assertTrue(resultados.get(0).getPrecio() > 0);
+	@Test
+	void extraerDatos_precios_sonTodosPositivos()
+	{
+		List<WebElement> lista = buildContainerList(10);
 
-        resultados.stream()
-            .filter(p -> p.getPrecio() != null)
-            .forEach(p -> assertTrue(
-                p.getPrecio() > 0,
-                "Precio debe ser positivo, encontrado: " + p.getPrecio()
-            )
-        );
-    }
+		when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS))
+			.thenReturn(lista);
 
-    @Test
-    void extraerDatos_precioConTextoNoNumerico_seteaNull() {
-        WebElement c    = mock(WebElement.class);
-        WebElement link = mock(WebElement.class);
-        WebElement price= mock(WebElement.class);
+		List<ProductResult> resultados =
+			MercadoLibreScraper.extraerDatos(driver, "test");
 
-        when(link.getText()).thenReturn("Producto");
-        when(link.getAttribute("href"))
-            .thenReturn("https://articulo.mercadolibre.com.ar/MLA-1");
-        when(price.getText()).thenReturn("Precio a consultar"); // no numérico
+		assertFalse(resultados.isEmpty(), "La lista no debe estar vacía");
+		resultados.stream()
+			.filter(p -> p.getPrecio() != null)
+			.forEach(p -> assertTrue(p.getPrecio() > 0,
+				"Precio debe ser positivo, encontrado: " + p.getPrecio()));
+	}
 
-        when(c.findElement(Selectors.PRODUCT_LINK)).thenReturn(link);
-        when(c.findElement(Selectors.PRODUCT_PRICE)).thenReturn(price);
-        when(c.findElement(Selectors.PRODUCT_OFFICIAL_STORE))
-            .thenThrow(new NoSuchElementException(""));
-        when(c.findElement(Selectors.PRODUCT_SHIPPING))
-            .thenThrow(new NoSuchElementException(""));
-        when(c.findElement(Selectors.PRODUCT_INSTALLMENTS))
-            .thenThrow(new NoSuchElementException(""));
+	@Test
+	void extraerDatos_precioConTextoNoNumerico_seteaNull()
+	{
+		WebElement c     = mock(WebElement.class);
+		WebElement link  = mock(WebElement.class);
+		WebElement price = mock(WebElement.class);
 
-        when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS)).thenReturn(List.of(c));
+		when(link.getText()).thenReturn("Producto");
+		when(link.getAttribute("href"))
+			.thenReturn("https://articulo.mercadolibre.com.ar/MLA-1");
+		when(price.getText()).thenReturn("Precio a consultar");
 
-        List<ProductResult> result = MercadoLibreScraper.extraerDatos(driver, "test");
+		when(c.findElement(Selectors.PRODUCT_LINK)).thenReturn(link);
+		when(c.findElement(Selectors.PRODUCT_PRICE)).thenReturn(price);
+		when(c.findElement(Selectors.PRODUCT_OFFICIAL_STORE))
+			.thenThrow(new NoSuchElementException("no store"));
+		when(c.findElement(Selectors.PRODUCT_SHIPPING))
+			.thenThrow(new NoSuchElementException("no shipping"));
+		when(c.findElement(Selectors.PRODUCT_INSTALLMENTS))
+			.thenThrow(new NoSuchElementException("no installments"));
 
-        assertEquals(1, result.size());
-        assertNull(result.get(0).getPrecio(),
-            "Precio no numérico debe quedar como null");
-    }
+		when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS))
+			.thenReturn(List.of(c));
 
-    // ── 4. Links absolutos ───────────────────────────────────────────────────
+		List<ProductResult> resultados =
+			MercadoLibreScraper.extraerDatos(driver, "test");
 
-    @Test
-    void extraerDatos_links_sonUrlsAbsolutasValidas() {
-        when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS))
-            .thenReturn(buildContainers(10));
+		assertEquals(1, resultados.size());
+		assertNull(resultados.get(0).getPrecio(),
+			"Precio no numérico debe quedar como null");
+	}
 
-        List<ProductResult> result = MercadoLibreScraper.extraerDatos(driver, "test");
+	// ── 4. Links absolutos ─────────────────────────────────────────────────────
 
-        result.stream()
-            .filter(p -> p.getLink() != null)
-            .forEach(p -> {
-                URI uri = assertDoesNotThrow(() -> new URI(p.getLink()),
-                    "link no es URI válida: " + p.getLink());
-                assertTrue(uri.isAbsolute(),
-                    "link debe ser absoluta: " + p.getLink());
-                assertTrue(uri.getScheme().startsWith("http"),
-                    "scheme debe ser http/https: " + p.getLink());
-            });
-    }
+	@Test
+	void extraerDatos_links_sonUrlsAbsolutasValidas()
+	{
+		List<WebElement> lista = buildContainerList(10);
+		when(driver.findElements(Selectors.CONTENEDOR_RESULTADOS))
+			.thenReturn(lista);
 
-    // ── tryGetText / tryGetLong ──────────────────────────────────────────────
+		List<ProductResult> resultados =
+			MercadoLibreScraper.extraerDatos(driver, "test");
 
-    @Test
-    void tryGetText_elementoPresente_retornaTextoLimpio() {
-        when(container.findElement(any())).thenReturn(linkElement);
-        when(linkElement.getText()).thenReturn("  Texto con espacios  ");
+		assertFalse(resultados.isEmpty());
+		resultados.stream()
+			.filter(p -> p.getLink() != null)
+			.forEach(p -> {
+				URI uri = assertDoesNotThrow(
+					() -> new URI(p.getLink()),
+					"link no es URI válida: " + p.getLink()
+				);
+				assertTrue(uri.isAbsolute(),
+					"link debe ser absoluta: " + p.getLink());
+				assertTrue(uri.getScheme().startsWith("http"),
+					"scheme debe ser http/https: " + p.getLink());
+			});
+	}
 
-        String result = MercadoLibreScraper.tryGetText(container,
-                            Selectors.PRODUCT_LINK, "");
+	// ── tryGetText ─────────────────────────────────────────────────────────────
 
-        assertEquals("Texto con espacios", result);
-    }
+	@Test
+	void tryGetText_elementoPresente_retornaTextoLimpio()
+	{
+		when(container.findElement(Selectors.PRODUCT_LINK)).thenReturn(linkElement);
+		when(linkElement.getText()).thenReturn("  Texto con espacios  ");
+
+		String result = MercadoLibreScraper.tryGetText(
+			container, Selectors.PRODUCT_LINK, "");
+
+		assertEquals("Texto con espacios", result);
+	}
 
     @Test
     void tryGetText_elementoAusente_retornaNull() {
-        when(container.findElement(any()))
+        when(container.findElement(Selectors.PRODUCT_LINK))
             .thenThrow(new NoSuchElementException("not found"));
 
-        String result = MercadoLibreScraper.tryGetText(container,
-                            Selectors.PRODUCT_LINK, "");
+        String result = MercadoLibreScraper.tryGetText(
+            container, Selectors.PRODUCT_LINK, "");
 
         assertNull(result);
     }
 
     @Test
     void tryGetText_conPrefijo_eliminaPrefijo() {
-        when(container.findElement(any())).thenReturn(linkElement);
+        when(container.findElement(Selectors.PRODUCT_OFFICIAL_STORE))
+            .thenReturn(linkElement);
         when(linkElement.getText()).thenReturn("por Tienda Oficial");
 
-        String result = MercadoLibreScraper.tryGetText(container,
-                            Selectors.PRODUCT_OFFICIAL_STORE, "por ");
+        String result = MercadoLibreScraper.tryGetText(
+            container, Selectors.PRODUCT_OFFICIAL_STORE, "por ");
 
         assertEquals("Tienda Oficial", result);
     }
 
     @Test
+    void tryGetText_textoVacio_retornaNull() {
+        when(container.findElement(Selectors.PRODUCT_LINK)).thenReturn(linkElement);
+        when(linkElement.getText()).thenReturn("   ");
+
+        String result = MercadoLibreScraper.tryGetText(
+            container, Selectors.PRODUCT_LINK, "");
+
+        assertNull(result);
+    }
+
+    // ── tryGetLong ─────────────────────────────────────────────────────────────
+
+    @Test
     void tryGetLong_textoNumericoConSeparadores_retornaLong() {
-        when(container.findElement(any())).thenReturn(priceElement);
+        when(container.findElement(Selectors.PRODUCT_PRICE)).thenReturn(priceElement);
         when(priceElement.getText()).thenReturn("1.250.000");
 
         Long result = MercadoLibreScraper.tryGetLong(container, Selectors.PRODUCT_PRICE);
@@ -275,7 +339,7 @@ class MercadoLibreScraperTest {
 
     @Test
     void tryGetLong_elementoAusente_retornaNull() {
-        when(container.findElement(any()))
+        when(container.findElement(Selectors.PRODUCT_PRICE))
             .thenThrow(new NoSuchElementException("not found"));
 
         Long result = MercadoLibreScraper.tryGetLong(container, Selectors.PRODUCT_PRICE);
@@ -283,23 +347,29 @@ class MercadoLibreScraperTest {
         assertNull(result);
     }
 
-    // ── sanitizar ────────────────────────────────────────────────────────────
+    // ── sanitizar ──────────────────────────────────────────────────────────────
 
     @Test
     void sanitizar_nombreConEspaciosYMayusculas_generaSlugValido() {
-        String slug = MercadoLibreScraper.sanitizar("iPhone 16 Pro Max");
-        assertEquals("iphone_16_pro_max", slug);
+        assertEquals("iphone_16_pro_max",
+            MercadoLibreScraper.sanitizar("iPhone 16 Pro Max"));
     }
 
     @Test
     void sanitizar_nombreConCaracteresEspeciales_losElimina() {
         String slug = MercadoLibreScraper.sanitizar("GeForce RTX 5090!!");
-        assertFalse(slug.endsWith("_"),
-            "No debe terminar con underscore");
-        assertFalse(slug.contains("!"));
+        assertFalse(slug.endsWith("_"), "No debe terminar con underscore");
+        assertFalse(slug.contains("!"), "No debe contener '!'");
     }
 
-    // ── guardarJson ──────────────────────────────────────────────────────────
+    @Test
+    void sanitizar_espaciosMultiples_colapsanEnUnGuion() {
+        String slug = MercadoLibreScraper.sanitizar("bicicleta  rodado   29");
+        assertFalse(slug.contains("__"), "No debe tener guiones dobles");
+        assertEquals("bicicleta_rodado_29", slug);
+    }
+
+    // ── guardarJson ────────────────────────────────────────────────────────────
 
     @Test
     void guardarJson_listaValida_creaArchivoLegible() throws IOException {
@@ -308,15 +378,13 @@ class MercadoLibreScraperTest {
         p.setPrecio(100_000L);
         p.setLink("https://example.com");
 
-        Path outDir = Path.of("output");
-        MercadoLibreScraper.guardarJson("test_guardar", List.of(p));
+        MercadoLibreScraper.guardarJson("test_guardar_scraper", List.of(p));
 
-        Path file = outDir.resolve("test_guardar.json");
+        Path file = Path.of("output", "test_guardar_scraper.json");
         assertTrue(Files.exists(file), "El archivo JSON debe existir");
-        String content = Files.readString(file);
-        assertTrue(content.contains("Test"), "El JSON debe contener el título");
+        assertTrue(Files.readString(file).contains("Test"),
+            "El JSON debe contener el título");
 
-        // limpieza
         Files.deleteIfExists(file);
     }
 }

@@ -3,8 +3,12 @@ package ar.edu.sip;
 
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.Keys;
+import org.openqa.selenium.support.ui.ExpectedConditions;
 
 import java.net.URI;
 import java.time.Duration;
@@ -23,34 +27,48 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @EnabledIfEnvironmentVariable(named = "INTEGRATION", matches = "true")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class ScraperE2ETest {
+class ScraperE2ETest
+{
 
     private static WebDriver driver;
     private static WebDriverWait wait;
     private static final String PRODUCTO_TEST = "iPhone 16 Pro Max";
 
-    @BeforeAll
-    static void setUp() {
-        driver = BrowserFactory.create(null);  // Usa BROWSER + HEADLESS del entorno
-        wait   = new WebDriverWait(driver, Duration.ofSeconds(20));
-    }
+	@BeforeAll
+	static void setUp() throws Exception
+	{
+		// Usa BROWSER + HEADLESS del entorno
+		driver = BrowserFactory.create(null);
+		wait   = new WebDriverWait(driver, Duration.ofSeconds(20));
 
-    @AfterAll
-    static void tearDown() {
-        if (driver != null) driver.quit();
-    }
+		// Solo navegar y buscar, sin guardar JSON ni screenshot
+		driver.get("https://www.mercadolibre.com.ar");
+		WebElement campo = wait.until(
+			ExpectedConditions.elementToBeClickable(Selectors.INPUT_BUSQUEDA)
+		);
+		campo.clear();
+		campo.sendKeys(PRODUCTO_TEST, Keys.ENTER);
+		MercadoLibreScraper.esperarResultados(wait, PRODUCTO_TEST);
+	}
 
-    // ── 1. Al menos 10 resultados ────────────────────────────────────────────
+	@AfterAll
+	static void tearDown() { if (driver != null) driver.quit(); }
 
-    @Test
-    @Order(1)
-    void e2e_scraper_extraeAlMenos10Resultados() {
-        List<ProductResult> resultados =
-            MercadoLibreScraper.extraerDatos(driver, PRODUCTO_TEST);
+	// ── 1. Al menos 10 resultados ────────────────────────────────────────────
 
-        assertTrue(resultados.size() >= 10,
-            "Se esperaban al menos 10 resultados, se obtuvieron: " + resultados.size());
-    }
+	@Test
+	@Order(1)
+	void e2e_scraper_extraeAlMenos10Resultados()
+	{
+		List<ProductResult> resultados =
+			MercadoLibreScraper.extraerDatos(driver, PRODUCTO_TEST);
+
+		assertTrue(
+			resultados.size() >= 10,
+			"Se esperaban al menos 10 resultados, se obtuvieron: " +
+			resultados.size()
+		);
+	}
 
     // ── 2. Schema mínimo ─────────────────────────────────────────────────────
 

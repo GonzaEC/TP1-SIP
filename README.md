@@ -109,6 +109,23 @@ mvn compile exec:java
 mvn compile exec:java -Dbrowser=firefox
 ```
 
+### HIT 6 — Modo Headless
+**Carpeta:** `HIT6/`
+Se ejecuta un set de tests automatizados (`JUnit`) que validan Que:
+* Scraper extrae al menos 10 resultados por producto.
+* El JSON generado cumple un schema mínimo (todos los campos requeridos, tipos correctos).
+* Los precios extraídos son números positivos.
+* Todos los links son URLs absolutas válidas.
+
+Los tests deben correr en CI tanto en Chrome como en Firefox.
+
+Cobertura mínima: 70 %. Configure el reporte de cobertura (coverage.py + pytest-cov, jest --coverage, jacoco) y agregue una etapa al pipeline de CI que falle si la cobertura cae debajo del 70 %. Publique el reporte HTML como artifact del workflow.
+
+```bash
+cd HIT6
+mvn test
+INTEGRATION=true mvn test
+```
 ---
 
 ## Principios de implementación

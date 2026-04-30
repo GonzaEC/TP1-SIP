@@ -1,10 +1,18 @@
-# Ignorar todas las carpetas de salida de compilación
+# ── Entorno local (NUNCA subir al repo) ──────────────────────────
+.env
+
+# ── Maven ─────────────────────────────────────────────────────────
 target/
 
-# Opcional: si usas IntelliJ o Eclipse, también es bueno ignorar:
-*.class
+# ── Salidas del scraper ───────────────────────────────────────────
+output/
+screenshots/
+
+# ── IDEs ──────────────────────────────────────────────────────────
 .idea/
 *.iml
+.vscode/
+*.class
 .settings/
 .project
 .classpath
