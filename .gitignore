@@ -1,1 +1,10 @@
-*/target/
+# Ignorar todas las carpetas de salida de compilación
+target/
+
+# Opcional: si usas IntelliJ o Eclipse, también es bueno ignorar:
+*.class
+.idea/
+*.iml
+.settings/
+.project
+.classpath
