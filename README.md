@@ -13,6 +13,7 @@ Scraper multi-browser de MercadoLibre Argentina construido de forma incremental 
 | Cristian Tomás Anito      | 158887 |
 | Rocco Buzzo Marcelo       | 190292 |
 | Gonzalo Echeverria Crenna | 195155 |
+| Federico Matias Claros Garcia | 166717 |
 
 ---
 
