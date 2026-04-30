@@ -1,0 +1,116 @@
+name: HIT6 – Scraper CI
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+
+  # ── Job 1: Tests unitarios + cobertura (sin browser real) ──────────────────
+  unit-tests:
+    name: Unit Tests & Coverage (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome, firefox]
+
+    env:
+      BROWSER: ${{ matrix.browser }}
+      HEADLESS: "true"
+      INTEGRATION: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Install Firefox
+        if: matrix.browser == 'firefox'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y firefox
+
+      # working-directory apunta a HIT6/ donde vive el pom.xml
+      - name: Build & Test con cobertura
+        working-directory: HIT6
+        run: mvn --batch-mode verify -Dbrowser=${{ matrix.browser }}
+
+      - name: Upload JaCoCo HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report-${{ matrix.browser }}
+          path: HIT6/target/site/jacoco/
+          retention-days: 14
+
+      - name: Upload Surefire XML results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-results-${{ matrix.browser }}
+          path: HIT6/target/surefire-reports/
+          retention-days: 7
+
+  # ── Job 2: Tests E2E con browser real (solo en main) ──────────────────────
+  e2e-tests:
+    name: E2E Tests (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome, firefox]
+
+    env:
+      BROWSER: ${{ matrix.browser }}
+      HEADLESS: "true"
+      INTEGRATION: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Install Firefox
+        if: matrix.browser == 'firefox'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y firefox
+
+      - name: E2E Tests contra MercadoLibre
+        working-directory: HIT6
+        run: mvn --batch-mode test -Dbrowser=${{ matrix.browser }}
+
+      - name: Upload screenshots ante fallo
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-e2e-${{ matrix.browser }}
+          path: HIT6/screenshots/
+          retention-days: 7
+
+      - name: Upload JSONs generados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-json-${{ matrix.browser }}
+          path: HIT6/output/
+          retention-days: 7

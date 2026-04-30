@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>ar.edu.sip</groupId>
+    <artifactId>hit5-scraper</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- Dependencias principales -->
+        <selenium.version>4.20.0</selenium.version>
+        <jackson.version>2.17.0</jackson.version>
+
+        <!-- Testing -->
+        <junit.jupiter.version>5.10.2</junit.jupiter.version>
+        <mockito.version>5.11.0</mockito.version>
+
+        <!-- Cobertura mínima requerida: 70 % -->
+        <jacoco.minimum.coverage>0.70</jacoco.minimum.coverage>
+
+        <!-- Navegador por defecto para exec:java -->
+        <browser>chrome</browser>
+    </properties>
+
+    <dependencies>
+        <!-- ── Runtime ───────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-java</artifactId>
+            <version>${selenium.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+
+        <!-- ── Test ──────────────────────────────────────────────────────── -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+
+            <!-- ── 1. Surefire: pasa variables de entorno a los tests ──────
+                 Lee BROWSER, HEADLESS e INTEGRATION del entorno del proceso
+                 (ya resueltas por el shell o por el workflow de GitHub Actions)
+                 y las convierte en system properties para que BrowserFactory
+                 las pueda leer con System.getenv().
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <environmentVariables>
+                        <BROWSER>${env.BROWSER}</BROWSER>
+                        <HEADLESS>${env.HEADLESS}</HEADLESS>
+                        <INTEGRATION>${env.INTEGRATION}</INTEGRATION>
+                    </environmentVariables>
+                    <!-- Reenviar también como system property para resolveHeadless() -->
+                    <systemPropertyVariables>
+                        <browser>${env.BROWSER}</browser>
+                        <headless>${env.HEADLESS}</headless>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+
+            <!-- ── 2. JaCoCo: instrumentación y reporte de cobertura ───────
+                 prepare-agent  → instrumenta las clases antes de los tests
+                 report         → genera HTML en target/site/jacoco/
+                 check          → falla el build si cobertura < 70 %
+            -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <executions>
+
+                    <!-- Fase: initialize → agrega el agente de JaCoCo al JVM de tests -->
+                    <execution>
+                        <id>jacoco-prepare-agent</id>
+                        <goals><goal>prepare-agent</goal></goals>
+                    </execution>
+
+                    <!-- Fase: verify → genera el reporte HTML -->
+                    <execution>
+                        <id>jacoco-report</id>
+                        <phase>verify</phase>
+                        <goals><goal>report</goal></goals>
+                    </execution>
+
+                    <!-- Fase: verify → falla si cobertura cae bajo el mínimo -->
+                    <execution>
+                        <id>jacoco-check</id>
+                        <phase>verify</phase>
+                        <goals><goal>check</goal></goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.minimum.coverage}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                            <!-- Excluir main() y clases que solo tienen constantes -->
+                            <excludes>
+                                <exclude>ar/edu/sip/Selectors.class</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+
+                </executions>
+            </plugin>
+
+            <!-- ── 3. exec-maven-plugin: lanza el scraper directamente ──── -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <mainClass>ar.edu.sip.MercadoLibreScraper</mainClass>
+                    <systemProperties>
+                        <systemProperty>
+                            <key>browser</key>
+                            <value>${browser}</value>
+                        </systemProperty>
+                    </systemProperties>
+                </configuration>
+            </plugin>
+
+        </plugins>
+    </build>
+</project>
