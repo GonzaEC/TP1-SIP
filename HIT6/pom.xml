@@ -30,6 +30,18 @@
         <browser>chrome</browser>
     </properties>
 
+    <!-- 1. SOLUCIÓN AL ERROR DE INCOMPATIBILIDAD: 
+         Forzamos a que ignore google-collections, que es lo que rompe el linter -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.google.collections</groupId>
+                <artifactId>google-collections</artifactId>
+                <version>9999.0-empty-to-avoid-conflict-with-guava</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <!-- ── Runtime ───────────────────────────────────────────────────── -->
         <dependency>
@@ -61,12 +73,7 @@
     <build>
         <plugins>
 
-            <!-- ── 1. Surefire: pasa variables de entorno a los tests ──────
-                 Lee BROWSER, HEADLESS e INTEGRATION del entorno del proceso
-                 (ya resueltas por el shell o por el workflow de GitHub Actions)
-                 y las convierte en system properties para que BrowserFactory
-                 las pueda leer con System.getenv().
-            -->
+            <!-- ── Surefire: pasa variables de entorno a los tests ────── -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -77,7 +84,6 @@
                         <HEADLESS>${env.HEADLESS}</HEADLESS>
                         <INTEGRATION>${env.INTEGRATION}</INTEGRATION>
                     </environmentVariables>
-                    <!-- Reenviar también como system property para resolveHeadless() -->
                     <systemPropertyVariables>
                         <browser>${env.BROWSER}</browser>
                         <headless>${env.HEADLESS}</headless>
@@ -85,31 +91,21 @@
                 </configuration>
             </plugin>
 
-            <!-- ── 2. JaCoCo: instrumentación y reporte de cobertura ───────
-                 prepare-agent  → instrumenta las clases antes de los tests
-                 report         → genera HTML en target/site/jacoco/
-                 check          → falla el build si cobertura < 70 %
-            -->
+            <!-- ── JaCoCo: instrumentación y reporte de cobertura ─────── -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.12</version>
                 <executions>
-
-                    <!-- Fase: initialize → agrega el agente de JaCoCo al JVM de tests -->
                     <execution>
                         <id>jacoco-prepare-agent</id>
                         <goals><goal>prepare-agent</goal></goals>
                     </execution>
-
-                    <!-- Fase: verify → genera el reporte HTML -->
                     <execution>
                         <id>jacoco-report</id>
                         <phase>verify</phase>
                         <goals><goal>report</goal></goals>
                     </execution>
-
-                    <!-- Fase: verify → falla si cobertura cae bajo el mínimo -->
                     <execution>
                         <id>jacoco-check</id>
                         <phase>verify</phase>
@@ -127,17 +123,68 @@
                                     </limits>
                                 </rule>
                             </rules>
-                            <!-- Excluir main() y clases que solo tienen constantes -->
                             <excludes>
                                 <exclude>ar/edu/sip/Selectors.class</exclude>
                             </excludes>
                         </configuration>
                     </execution>
-
                 </executions>
             </plugin>
 
-            <!-- ── 3. exec-maven-plugin: lanza el scraper directamente ──── -->
+            <!-- ── Checkstyle: linter de estilo (ACTUALIZADO) ────────── -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.3.1</version>
+                <dependencies>
+                    <!-- 2. SOLUCIÓN AL ERROR DE API:
+                         Actualizamos el core de checkstyle a una versión moderna -->
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>10.12.4</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <configLocation>checkstyle.xml</configLocation>
+                    <consoleOutput>true</consoleOutput>
+                    <failsOnError>true</failsOnError>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>validate</id>
+                        <phase>validate</phase>
+                        <goals><goal>check</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- ── Spotless: formatter ────────────────────────────────── -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>2.43.0</version>
+                <configuration>
+                    <java>
+                        <googleJavaFormat>
+                            <version>1.22.0</version>
+                            <style>GOOGLE</style>
+                        </googleJavaFormat>
+                        <removeUnusedImports/>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals><goal>check</goal></goals>
+                        <phase>validate</phase>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- ── exec-maven-plugin: lanza el scraper directamente ──── -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>

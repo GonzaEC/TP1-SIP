@@ -1,110 +1,108 @@
 // HIT6/src/main/java/ar/edu/sip/BrowserFactory.java
 package ar.edu.sip;
 
+import java.util.List;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 
-import java.util.List;
+public class BrowserFactory {
 
-public class BrowserFactory
-{
+  private BrowserFactory() {}
 
-	private BrowserFactory() {}
-	// Definicion explicita de user agents para prevenir error en Mercado Libre
-	private static String userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+  // Definicion explicita de user agents para prevenir error en Mercado Libre
+  private static String userAgent =
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-	public static WebDriver create(String browserName)
-	{
-		return create(browserName, resolveHeadless());
-	}
+  public static WebDriver create(String browserName) {
+    return create(browserName, resolveHeadless());
+  }
 
-	public static WebDriver create(String browserName, boolean headless)
-	{
-		String nombre = resolveName(browserName);
-		System.out.println(
-			"[BrowserFactory] Browser: " + nombre + " | Headless: " + headless
-		);
-		return switch (nombre.toLowerCase())
-		{
-			case "chrome"  -> buildChrome(headless);
-			case "firefox" -> buildFirefox(headless);
-			default -> throw new IllegalArgumentException(
-				"Browser not supported: \""
-				+ nombre +
-				"\". Valid values: chrome, firefox"
-			);
-		};
-	}
+  public static WebDriver create(String browserName, boolean headless) {
+    String nombre = resolveName(browserName);
+    System.out.println("[BrowserFactory] Browser: " + nombre + " | Headless: " + headless);
+    return switch (nombre.toLowerCase()) {
+      case "chrome" -> buildChrome(headless);
+      case "firefox" -> buildFirefox(headless);
+      default ->
+          throw new IllegalArgumentException(
+              "Browser not supported: \"" + nombre + "\". Valid values: chrome, firefox");
+    };
+  }
 
-	public static WebDriver create() { return create(null); }
+  public static WebDriver create() {
+    return create(null);
+  }
 
-	public static String resolveName(String explicit)
-	{
-		if (explicit != null && !explicit.isBlank()) return explicit.trim();
+  public static String resolveName(String explicit) {
+    if (explicit != null && !explicit.isBlank()) {
+      return explicit.trim();
+    }
 
-		String prop = System.getProperty("browser");
+    String prop = System.getProperty("browser");
 
-		if (prop != null && !prop.isBlank()) return prop.trim();
+    if (prop != null && !prop.isBlank()) {
+      return prop.trim();
+    }
 
-		String env = System.getenv("BROWSER");
+    String env = System.getenv("BROWSER");
 
-		if (env != null && !env.isBlank()) return env.trim();
-		return "chrome";
-	}
-	/**
-	 * Resuelve el modo headless.
-	 * Prioridad: System property "headless" → variable de entorno HEADLESS → false por defecto.
-	 */
-	public static boolean resolveHeadless()
-	{
-		String property = System.getProperty("headless");
+    if (env != null && !env.isBlank()) {
+      return env.trim();
+    }
+    return "chrome";
+  }
 
-		if (property != null) return Boolean.parseBoolean(property.trim());
+  /**
+   * Resuelve el modo headless. Prioridad: System property "headless" → variable de entorno HEADLESS
+   * → false por defecto.
+   */
+  public static boolean resolveHeadless() {
+    String property = System.getProperty("headless");
 
-		String env = System.getenv("HEADLESS");
-		if (env != null) return Boolean.parseBoolean(env.trim());
+    if (property != null) {
+      return Boolean.parseBoolean(property.trim());
+    }
 
-		return false;
-	}
+    String env = System.getenv("HEADLESS");
+    if (env != null) {
+      return Boolean.parseBoolean(env.trim());
+    }
 
-	private static WebDriver buildChrome(boolean headless)
-	{
-		ChromeOptions opts = new ChromeOptions();
+    return false;
+  }
 
-		// Mantiene las configuraciones de automatización existentes
-		opts.setExperimentalOption("excludeSwitches", List.of("enable-automation"));
-		opts.addArguments("--disable-blink-features=AutomationControlled");
+  private static WebDriver buildChrome(boolean headless) {
+    ChromeOptions opts = new ChromeOptions();
 
-		// Workaround para evitar empty-state en MercadoLibre
-		opts.addArguments("--user-agent=" + userAgent);
+    // Mantiene las configuraciones de automatización existentes
+    opts.setExperimentalOption("excludeSwitches", List.of("enable-automation"));
+    opts.addArguments("--disable-blink-features=AutomationControlled");
 
-		if (headless) opts.addArguments(
-			"--headless=new",
-			"--no-sandbox",
-			"--disable-dev-shm-usage",
-			"--window-size=1920,1080"
-		);
-		return new ChromeDriver(opts);
-	}
+    // Workaround para evitar empty-state en MercadoLibre
+    opts.addArguments("--user-agent=" + userAgent);
 
-	private static WebDriver buildFirefox(boolean headless)
-	{
-		FirefoxOptions opts = new FirefoxOptions();
+    if (headless) {
+      opts.addArguments(
+          "--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--window-size=1920,1080");
+    }
+    return new ChromeDriver(opts);
+  }
 
-		opts.addPreference("dom.webdriver.enabled", false);
-		opts.addPreference("useAutomationExtension", false);
+  private static WebDriver buildFirefox(boolean headless) {
+    FirefoxOptions opts = new FirefoxOptions();
 
-		// Workaround para evitar empty-state en MercadoLibre
-		opts.addArguments("--user-agent=" + userAgent);
+    opts.addPreference("dom.webdriver.enabled", false);
+    opts.addPreference("useAutomationExtension", false);
 
-		if (headless) opts.addArguments(
-			"--headless",
-			"--width=1920",
-			"--height=1080"
-		);
-		return new FirefoxDriver(opts);
-	}
+    // Workaround para evitar empty-state en MercadoLibre
+    opts.addArguments("--user-agent=" + userAgent);
+
+    if (headless) {
+      opts.addArguments("--headless", "--width=1920", "--height=1080");
+    }
+    return new FirefoxDriver(opts);
+  }
 }

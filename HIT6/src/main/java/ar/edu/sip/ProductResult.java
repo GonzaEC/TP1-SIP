@@ -4,35 +4,65 @@ package ar.edu.sip;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class ProductResult {
-    private String titulo;
-    private Long precio;
-    private String link;
-    
-    @JsonProperty("tienda_oficial")
-    private String tiendaOficial;
-    
-    @JsonProperty("envio_gratis")
-    private boolean envioGratis;
-    
-    @JsonProperty("cuotas_sin_interes")
-    private String cuotasSinInteres;
+  private String titulo;
+  private Long precio;
+  private String link;
 
-    // Getters and Setters
-    public String getTitulo() { return titulo; }
-    public void setTitulo(String titulo) { this.titulo = titulo; }
+  @JsonProperty("tienda_oficial")
+  private String tiendaOficial;
 
-    public Long getPrecio() { return precio; }
-    public void setPrecio(Long precio) { this.precio = precio; }
+  @JsonProperty("envio_gratis")
+  private boolean envioGratis;
 
-    public String getLink() { return link; }
-    public void setLink(String link) { this.link = link; }
+  @JsonProperty("cuotas_sin_interes")
+  private String cuotasSinInteres;
 
-    public String getTiendaOficial() { return tiendaOficial; }
-    public void setTiendaOficial(String tiendaOficial) { this.tiendaOficial = tiendaOficial; }
+  // Getters and Setters
+  public String getTitulo() {
+    return titulo;
+  }
 
-    public boolean isEnvioGratis() { return envioGratis; }
-    public void setEnvioGratis(boolean envioGratis) { this.envioGratis = envioGratis; }
+  public void setTitulo(String titulo) {
+    this.titulo = titulo;
+  }
 
-    public String getCuotasSinInteres() { return cuotasSinInteres; }
-    public void setCuotasSinInteres(String cuotasSinInteres) { this.cuotasSinInteres = cuotasSinInteres; }
+  public Long getPrecio() {
+    return precio;
+  }
+
+  public void setPrecio(Long precio) {
+    this.precio = precio;
+  }
+
+  public String getLink() {
+    return link;
+  }
+
+  public void setLink(String link) {
+    this.link = link;
+  }
+
+  public String getTiendaOficial() {
+    return tiendaOficial;
+  }
+
+  public void setTiendaOficial(String tiendaOficial) {
+    this.tiendaOficial = tiendaOficial;
+  }
+
+  public boolean isEnvioGratis() {
+    return envioGratis;
+  }
+
+  public void setEnvioGratis(boolean envioGratis) {
+    this.envioGratis = envioGratis;
+  }
+
+  public String getCuotasSinInteres() {
+    return cuotasSinInteres;
+  }
+
+  public void setCuotasSinInteres(String cuotasSinInteres) {
+    this.cuotasSinInteres = cuotasSinInteres;
+  }
 }
