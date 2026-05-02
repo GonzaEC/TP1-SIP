@@ -10,12 +10,22 @@ Endurecimiento del scraper de MercadoLibre Argentina con modo headless controlab
 
 ### Modo headless por variable de entorno
 
+**Linux / macOS:**
 ```bash
 # Headless (sin abrir ventana)
 HEADLESS=true mvn exec:java
 
 # Visible (debug)
 HEADLESS=false mvn exec:java
+```
+
+**Windows (PowerShell):**
+```powershell
+# Headless (sin abrir ventana)
+$env:HEADLESS="true"; mvn exec:java
+
+# Visible (debug)
+$env:HEADLESS="false"; mvn exec:java
 ```
 
 Cadena de resolución: `-Dheadless` → `$HEADLESS` → `false` (default).
@@ -87,6 +97,7 @@ Detalles en el [README raíz](../README.md#pipeline-ci-github-actions).
 
 ## Ejecución rápida
 
+**Linux / macOS:**
 ```bash
 cd HIT6
 
@@ -99,6 +110,24 @@ mvn verify
 # Empaquetado y ejecución en Docker
 docker compose up scraper                  # Chrome
 BROWSER=firefox docker compose up scraper  # Firefox
+
+# Lint en container
+docker compose run --rm lint
+```
+
+**Windows (PowerShell):**
+```powershell
+cd HIT6
+
+# Local con Chrome headless
+$env:HEADLESS="true"; mvn exec:java
+
+# Tests + cobertura
+mvn verify
+
+# Empaquetado y ejecución en Docker
+docker compose up scraper                  # Chrome
+$env:BROWSER="firefox"; docker compose up scraper  # Firefox
 
 # Lint en container
 docker compose run --rm lint
