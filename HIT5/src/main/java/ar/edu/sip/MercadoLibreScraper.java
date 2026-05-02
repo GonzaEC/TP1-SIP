@@ -84,7 +84,7 @@ public class MercadoLibreScraper {
 
         // Extracción
         List<ProductResult> resultados = extraerDatos(driver, producto);
-        
+
         // Guardar
         guardarJson(producto, resultados);
         tomarScreenshot(driver, producto, browser);

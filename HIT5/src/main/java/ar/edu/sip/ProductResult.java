@@ -6,13 +6,13 @@ public class ProductResult {
     private String titulo;
     private Long precio;
     private String link;
-    
+
     @JsonProperty("tienda_oficial")
     private String tiendaOficial;
-    
+
     @JsonProperty("envio_gratis")
     private boolean envioGratis;
-    
+
     @JsonProperty("cuotas_sin_interes")
     private String cuotasSinInteres;
 

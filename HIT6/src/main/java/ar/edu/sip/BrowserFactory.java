@@ -79,16 +79,25 @@ public class BrowserFactory {
   private static WebDriver buildChrome(boolean headless) {
     ChromeOptions opts = new ChromeOptions();
 
-    // Mantiene las configuraciones de automatización existentes
+    // Reducir huella de automatización
     opts.setExperimentalOption("excludeSwitches", List.of("enable-automation"));
     opts.addArguments("--disable-blink-features=AutomationControlled");
 
     // Workaround para evitar empty-state en MercadoLibre
     opts.addArguments("--user-agent=" + CHROME_USER_AGENT);
 
+    // Flags adicionales para entornos de CI/contenedores
+    opts.addArguments(
+        "--disable-gpu",
+        "--disable-software-rasterizer",
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-default-apps",
+        "--no-first-run",
+        "--window-size=1920,1080");
+
     if (headless) {
-      opts.addArguments(
-          "--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--window-size=1920,1080");
+      opts.addArguments("--headless=new", "--no-sandbox", "--disable-dev-shm-usage");
     }
     return new ChromeDriver(opts);
   }
@@ -100,7 +109,12 @@ public class BrowserFactory {
     opts.addPreference("useAutomationExtension", false);
 
     // Workaround para evitar empty-state en MercadoLibre
-    opts.addArguments("--user-agent=" + FIREFOX_USER_AGENT);
+    // En Firefox el user-agent debe ir como preferencia, no como argumento de CLI.
+    opts.addPreference("general.useragent.override", FIREFOX_USER_AGENT);
+
+    // Reducir huella de automatización / tracking
+    opts.addPreference("privacy.trackingprotection.enabled", false);
+    opts.addPreference("browser.download.start_downloads_in_tmp_dir", true);
 
     if (headless) {
       opts.addArguments("--headless", "--width=1920", "--height=1080");

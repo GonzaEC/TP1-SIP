@@ -59,7 +59,7 @@ Ver `docker-compose.yml` para la config completa.
 
 ### Pipeline CI
 
-`.github/workflows/ci.yml` con 3 jobs en cadena:
+`.github/workflows/scrape.yml` con 3 jobs en cadena:
 
 ```
 secrets-scan (gitleaks)

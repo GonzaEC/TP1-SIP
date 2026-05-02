@@ -1,6 +1,6 @@
 # TP1 SIP — Selenium WebDriver Scraper Multi-Browser — G-ONE
 
-Trabajo práctico de la materia **Seminario de Integración Profesional (SIP)**.  
+Trabajo práctico de la materia **Seminario de Integración Profesional (SIP)**.
 Scraper multi-browser de MercadoLibre Argentina construido de forma incremental con **Java 17** y **Selenium WebDriver 4**.
 
 ---
@@ -55,7 +55,9 @@ El sitio elegido presenta los desafíos clásicos del scraping moderno: contenid
 TP1-SIP/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                  ← Pipeline CI (unit tests, docker, e2e, gitleaks)
+│       └── scrape.yml              ← Pipeline CI (gitleaks, unit tests + cobertura, docker)
+├── .gitattributes                  ← Normalización a LF para todos los text files
+├── .gitignore                      ← Maven target/, IDEs (.idea, .vscode, etc.), salidas, OS
 ├── .pre-commit-config.yaml         ← Hooks locales pre-commit
 ├── HIT1/   → Scraper básico con Chrome
 ├── HIT2/   → Browser Factory (Chrome y Firefox)
@@ -77,10 +79,18 @@ TP1-SIP/
 │       └── test/java/ar/edu/sip/
 │           ├── BrowserFactoryTest.java
 │           ├── MercadoLibreScrapperTest.java
-│           ├── ProductResultSchemaTest.java
-│           └── ScrapperE2ETest.java
-├── HIT7/   → (próximamente)
-└── HIT8/   → (próximamente)
+│           └── ProductResultSchemaTest.java
+├── HIT7/   → Orquestación con Kubernetes (k3s Job + CronJob + ConfigMap + PVC)
+│   └── k8s/                    ← Manifiestos Kubernetes (ConfigMap, PVC, Job, CronJob)
+├── HIT8/   → (pendiente)
+└── docs/
+    └── adr/                       ← Architecture Decision Records
+        ├── 0000-template.md
+        ├── 0001-framework-automatizacion.md
+        ├── 0002-estrategia-selectores.md
+        ├── 0003-stack-java-maven.md
+        ├── 0004-pre-commit-vs-ci.md
+        └── 0005-orquestacion-kubernetes.md
 ```
 
 ---
@@ -90,7 +100,7 @@ TP1-SIP/
 - Java 17 o superior
 - Maven 3.6 o superior
 - Docker Desktop (o Docker Engine en Linux)
-- Google Chrome y/o Mozilla Firefox instalados (solo para tests E2E locales)
+- Google Chrome y/o Mozilla Firefox instalados (solo para correr el scraper localmente sin Docker)
 - Python 3.8+ y `pip` (solo para activar pre-commit hooks)
 - Conexión a internet (Selenium Manager descarga los drivers la primera vez)
 
@@ -99,7 +109,12 @@ TP1-SIP/
 ## Hits implementados
 
 > [!NOTE]
-> Antes de pushear aplicar: `mvn spotless:apply` y `mvn clean validate`
+> Solo HIT6 tiene Spotless + Checkstyle configurados. Antes de pushear cambios en `HIT6/`, correr desde `HIT6/`:
+> ```bash
+> mvn spotless:apply        # auto-formatea con google-java-format
+> mvn clean verify          # corre Checkstyle, tests, JaCoCo (≥70%)
+> ```
+> Si tenés `pre-commit` instalado, ambos se disparan automáticamente en cada `git commit`.
 
 ### HIT 1 — Scraper básico con Chrome
 **Carpeta:** `HIT1/`
@@ -210,14 +225,20 @@ Cadena de resolución:
 
 #### Tests unitarios (sin browser)
 
-Usan Mockito para simular `WebDriver` y `WebElement`. No abren ningún browser. Validan la lógica de `extraerDatos`, `tryGetText`, `tryGetLong` y `sanitizar`.
+Usan Mockito para simular `WebDriver` y `WebElement`. No abren ningún browser, corren en milisegundos. Validan los 4 criterios del hit (≥10 resultados, schema mínimo, precios positivos, links absolutos) más el resto de la lógica del scraper.
+
+| Archivo | Qué cubre |
+|---|---|
+| `BrowserFactoryTest` | Resolución de browser/headless por property/env, fallback a default, instanciación de drivers |
+| `MercadoLibreScrapperTest` | `extraerDatos`, `tryGetText`, `tryGetLong`, `sanitizar`, retries, banner, filtros, orden, screenshot |
+| `ProductResultSchemaTest` | Schema mínimo del JSON, anotaciones `@JsonProperty`, tipos correctos |
 
 ```bash
 cd HIT6
 mvn test
 ```
 
-Cobertura mínima configurada: **70 %** (JaCoCo falla el build si cae debajo).  
+Cobertura mínima configurada: **70 %** (JaCoCo falla el build si cae debajo). Cobertura actual: ~80 %.
 El reporte HTML se genera en `HIT6/target/site/jacoco/index.html`.
 
 ```bash
@@ -234,28 +255,14 @@ open target/site/jacoco/index.html
 
 ---
 
-#### Tests E2E (browser real contra mercadolibre.com.ar)
-
-Requieren `INTEGRATION=true`. Levantan un Chrome real, navegan a MercadoLibre y validan los 4 criterios del hit contra datos reales.
-
-```bash
-cd HIT6
-
-# Chrome headless
-INTEGRATION=true HEADLESS=true mvn test
-
-# Firefox headless
-INTEGRATION=true HEADLESS=true BROWSER=firefox mvn test
-
-# Chrome visible (debug)
-INTEGRATION=true HEADLESS=false mvn test
-```
-
----
-
 #### Docker
 
-La imagen es multi-stage: el stage `builder` compila con Maven y el stage `runtime` incluye JRE 17, Chrome, ChromeDriver, Firefox ESR y GeckoDriver con versiones fijas (sin `:latest`).
+La imagen es multi-stage:
+
+- Stage **`builder`**: compila con Maven 3.9.6 + JDK 17 (`maven:3.9.6-eclipse-temurin-17`) y empaqueta un fat jar con `maven-shade-plugin` (incluye Selenium + Jackson + `Main-Class` declarado).
+- Stage **`runtime`**: imagen mínima con JRE 17 (`eclipse-temurin:17.0.11_9-jre-jammy`) + **Google Chrome stable** (repo APT oficial de Google) + **Firefox** (repo APT oficial de Mozilla en `packages.mozilla.org`).
+
+Las **bases están pinneadas** por digest. Los browsers usan los repos APT oficiales — versión actual estable; los **drivers (`chromedriver`, `geckodriver`) los resuelve Selenium Manager en runtime** contra la versión exacta del browser instalado, evitando el problema de version-matching.
 
 **Construir la imagen:**
 ```bash
@@ -307,15 +314,13 @@ Los JSONs generados quedan en `HIT6/output/` y los screenshots en `HIT6/screensh
 
 #### Pipeline CI (GitHub Actions)
 
-El workflow `.github/workflows/ci.yml` corre automáticamente en cada push y pull request. La secuencia de jobs es:
+El workflow `.github/workflows/scrape.yml` corre automáticamente en cada push y pull request. La secuencia de jobs es:
 
 ```
 secrets-scan
     └── unit-tests (chrome) ──┐
-    └── unit-tests (firefox) ─┼── docker-scraper (chrome)
-                               └── docker-scraper (firefox)
-                               └── e2e-tests (chrome)    ← solo en main/master
-                               └── e2e-tests (firefox)   ← solo en main/master
+    └── unit-tests (firefox) ─┴── docker-scraper (chrome)
+                                  docker-scraper (firefox)
 ```
 
 | Job | Qué hace | Cuándo corre |
@@ -323,15 +328,12 @@ secrets-scan
 | `secrets-scan` | Gitleaks sobre todo el historial | Siempre |
 | `unit-tests` | `mvn verify` + JaCoCo ≥ 70 % en matriz chrome/firefox | Siempre |
 | `docker-scraper` | `docker build` + `docker run` headless en matriz chrome/firefox | Si unit-tests pasa |
-| `e2e-tests` | Tests E2E con browser real en matriz chrome/firefox | Solo en `main`/`master` |
 
 **Artifacts publicados por el pipeline:**
 - `jacoco-report-{browser}` — reporte HTML de cobertura (14 días)
 - `surefire-results-{browser}` — XML de resultados de tests (7 días)
 - `output-json-docker-{browser}` — JSONs generados por el scraper en Docker (7 días)
 - `screenshots-docker-{browser}` — screenshots del scraper en Docker (7 días)
-- `output-json-e2e-{browser}` — JSONs generados por los tests E2E (7 días)
-- `screenshots-e2e-{browser}` — screenshots ante fallo E2E (7 días)
 
 ---
 
@@ -352,10 +354,12 @@ pre-commit install
 | `gitleaks` | Secrets hardcodeados (tokens, passwords, keys) |
 | `trailing-whitespace` | Espacios al final de línea |
 | `end-of-file-fixer` | Newline al final de cada archivo |
+| `mixed-line-ending` | Normaliza CRLF → LF |
 | `check-merge-conflict` | Markers de merge sin resolver |
-| `check-yaml` / `check-xml` | Sintaxis de YAML y XML |
-| `spotless-check` | Formato Java (Google Java Format) |
-| `checkstyle-check` | Estilo Java (nombres, llaves, imports) |
+| `check-yaml` | Sintaxis de YAML |
+| `check-added-large-files` | Bloquea archivos > 1 MB |
+| `spotless-apply` | Formato Java (auto-fix con Google Java Format) |
+| `checkstyle` | Estilo Java (nombres, llaves, imports) |
 
 **Ejecución manual sobre todos los archivos:**
 ```bash
@@ -366,6 +370,35 @@ pre-commit run --all-files
 ```bash
 git commit --no-verify -m "mensaje"
 ```
+
+---
+
+### HIT 7 — Despliegue en Kubernetes (k3s)
+**Carpeta:** `HIT7/`, manifiestos en `HIT7/k8s/`
+
+Orquesta el scraper en un cluster k3s/k3d usando recursos nativos de Kubernetes para batch processing:
+
+- **ConfigMap** (`HIT7/k8s/configmap.yaml`): externaliza `BROWSER`, `HEADLESS`, `LOG_LEVEL` y la lista de `PRODUCTS`.
+- **PVC** (`HIT7/k8s/pvc.yaml`): solicita 1 GB con `storageClassName: local-path` (viene en k3s).
+- **Job** (`HIT7/k8s/job.yaml`): ejecuta el scraper **una vez** y persiste outputs.
+- **CronJob** (`HIT7/k8s/cronjob.yaml`): ejecuta el scraper **cada hora** (`0 * * * *`).
+
+```bash
+# 1. Construir imagen
+cd HIT6 && docker build -t ml-scraper:latest .
+
+# 2. Cargar en k3s
+sudo k3s ctr images import ml-scraper.tar
+
+# 3. Aplicar manifiestos
+kubectl apply -f HIT7/k8s/
+
+# 4. Verificar
+kubectl logs -l job-name=scraper-once -f
+kubectl get cronjobs
+```
+
+Documentación completa en [`HIT7/README.md`](HIT7/README.md).
 
 ---
 

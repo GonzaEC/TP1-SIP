@@ -23,18 +23,27 @@ public class MercadoLibreScraper {
 
   static final int CANT_RESULTADOS = 10;
 
-  static final String[] PRODUCTOS = {
+  static final String[] PRODUCTOS_DEFAULT = {
     "bicicleta rodado 29", "iPhone 16 Pro Max", "GeForce RTX 5090"
   };
+
+  static String[] resolveProductos() {
+    String env = System.getenv("PRODUCTS");
+    if (env != null && !env.isBlank()) {
+      return env.lines().map(String::trim).filter(s -> !s.isEmpty()).toArray(String[]::new);
+    }
+    return PRODUCTOS_DEFAULT;
+  }
 
   public static void main(String[] args) throws IOException {
     String browser = BrowserFactory.resolveName(null);
     boolean headless = BrowserFactory.resolveHeadless();
+    String[] productos = resolveProductos();
     WebDriver driver = BrowserFactory.create(browser, headless);
     WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TIMEOUT_SEG));
 
     try {
-      for (String producto : PRODUCTOS) {
+      for (String producto : productos) {
         System.out.println("\n[PROCESS] Iniciando: " + producto);
         ejecutarConReintentos(driver, wait, producto, browser);
       }
