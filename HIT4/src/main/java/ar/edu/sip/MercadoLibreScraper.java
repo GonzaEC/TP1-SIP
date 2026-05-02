@@ -64,7 +64,7 @@ public class MercadoLibreScraper {
         // Guardar JSON
         guardarJson(producto, resultados);
 
-        // Screenshot (opcional, pero buena práctica mantener lo de Hit #3 si es posible)
+        // Screenshot (opcional , pero buena práctica mantener lo de Hit #3 si es posible)
         tomarScreenshot(driver, producto, browser);
     }
 

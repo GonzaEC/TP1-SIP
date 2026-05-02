@@ -51,7 +51,7 @@ public class MercadoLibreScraper {
                 By.cssSelector("li.ui-search-layout__item")
             ));
 
-            // Probar cada selector hasta encontrar uno que devuelva resultados
+            // Probar cada selector hasta encontrar  uno que devuelva resultados
             List<WebElement> titulos = buscarTitulos(driver);
 
             if (titulos.isEmpty()) {

@@ -241,6 +241,7 @@ mvn compile exec:java -Dbrowser=firefox   # Firefox
 
 El modo headless se controla por variable de entorno o system property sin tocar el código:
 
+**Linux / macOS:**
 ```bash
 cd HIT6
 
@@ -249,6 +250,17 @@ HEADLESS=true mvn exec:java
 
 # Modo visible (útil para debug)
 HEADLESS=false mvn exec:java
+```
+
+**Windows (PowerShell):**
+```powershell
+cd HIT6
+
+# Modo headless (sin abrir ventana)
+$env:HEADLESS="true"; mvn exec:java
+
+# Modo visible (útil para debug)
+$env:HEADLESS="false"; mvn exec:java
 ```
 
 Cadena de resolución:
@@ -286,6 +298,9 @@ xdg-open target/site/jacoco/index.html
 
 # Abrir reporte (macOS)
 open target/site/jacoco/index.html
+
+# Abrir reporte (Windows PowerShell)
+start target/site/jacoco/index.html
 ```
 
 ---
@@ -306,6 +321,8 @@ docker build -t ml-scraper:latest .
 ```
 
 **Correr el scraper con Docker:**
+
+**Linux / macOS:**
 ```bash
 # Chrome (default)
 docker run --rm \
@@ -326,7 +343,30 @@ docker run --rm \
   ml-scraper:latest
 ```
 
+**Windows (PowerShell):**
+```powershell
+# Chrome (default)
+docker run --rm `
+  -v ${PWD}/output:/app/output `
+  -v ${PWD}/screenshots:/app/screenshots `
+  ml-scraper:latest
+
+# Firefox
+docker run --rm `
+  -v ${PWD}/output:/app/output `
+  -v ${PWD}/screenshots:/app/screenshots `
+  ml-scraper:latest --browser firefox
+
+# Modo visible
+docker run --rm `
+  -e HEADLESS=false `
+  -v ${PWD}/output:/app/output `
+  ml-scraper:latest
+```
+
 **Con Docker Compose:**
+
+**Linux / macOS:**
 ```bash
 cd HIT6
 
@@ -335,6 +375,23 @@ docker compose up scraper
 
 # Firefox
 BROWSER=firefox docker compose up scraper
+
+# Lint (Checkstyle + Spotless, sin instalar nada local)
+docker compose run --rm lint
+
+# Tests unitarios + cobertura dentro del contenedor
+docker compose run --rm test
+```
+
+**Windows (PowerShell):**
+```powershell
+cd HIT6
+
+# Chrome headless (default)
+docker compose up scraper
+
+# Firefox
+$env:BROWSER="firefox"; docker compose up scraper
 
 # Lint (Checkstyle + Spotless, sin instalar nada local)
 docker compose run --rm lint
@@ -428,6 +485,7 @@ Orquesta el scraper en un cluster k3s/k3d usando recursos nativos de Kubernetes 
 
 La imagen Docker está publicada en GitHub Container Registry y es descargada automáticamente por el cluster:
 
+**Linux / macOS / Windows:**
 ```bash
 # La imagen se descarga sola — no hace falta docker build ni image import
 kubectl apply -f HIT7/k8s/

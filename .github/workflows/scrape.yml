@@ -255,7 +255,8 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Normalizar owner a minúsculas
-        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+        id: owner
+        run: echo "value=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Build and push HIT6
         uses: docker/build-push-action@v6
@@ -263,8 +264,8 @@ jobs:
           context: HIT6
           push: true
           tags: |
-            ghcr.io/${{ env.OWNER }}/ml-scraper:latest
-            ghcr.io/${{ env.OWNER }}/ml-scraper:${{ github.sha }}
+            ghcr.io/${{ steps.owner.outputs.value }}/ml-scraper:latest
+            ghcr.io/${{ steps.owner.outputs.value }}/ml-scraper:${{ github.sha }}
 
   # ── Job 6: Publicar imagen HIT8 en ghcr.io (solo en push a main) ──────────
   publish-image-hit8:
@@ -292,7 +293,8 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Normalizar owner a minúsculas
-        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+        id: owner
+        run: echo "value=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Build and push HIT8
         uses: docker/build-push-action@v6
@@ -300,6 +302,6 @@ jobs:
           context: HIT8
           push: true
           tags: |
-            ghcr.io/${{ env.OWNER }}/ml-scraper-hit8:latest
-            ghcr.io/${{ env.OWNER }}/ml-scraper-hit8:${{ github.sha }}
+            ghcr.io/${{ steps.owner.outputs.value }}/ml-scraper-hit8:latest
+            ghcr.io/${{ steps.owner.outputs.value }}/ml-scraper-hit8:${{ github.sha }}
 

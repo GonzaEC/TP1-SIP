@@ -33,7 +33,7 @@ public class MercadoLibreScraper {
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TIMEOUT_SEG));
 
         try {
-            // ── 1. Búsqueda ────────────────────────────────────────────────
+            // ── 1.  Búsqueda ────────────────────────────────────────────────
             driver.get(URL_BASE);
 
             WebElement campo = wait.until(

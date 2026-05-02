@@ -53,7 +53,7 @@ public class MercadoLibreScraper {
                 return;
             } catch (Exception e) {
                 System.err.printf("[ERROR] Fallo en intento %d/%d para '%s' (%s): %s%n",
-                                  intento, MAX_REINTENTOS, producto, browser, e.getMessage());
+                                intento, MAX_REINTENTOS, producto, browser, e.getMessage());
 
                 if (intento == MAX_REINTENTOS) {
                     System.err.println("[CRITICAL] Se agotaron los reintentos para: " + producto);

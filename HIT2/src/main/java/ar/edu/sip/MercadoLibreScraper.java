@@ -26,7 +26,7 @@ public class MercadoLibreScraper {
     };
 
     public static void main(String[] args) {
-        // BrowserFactory resuelve: argumento > system property > env var > "chrome"
+        //  BrowserFactory resuelve: argumento > system property > env var > "chrome"
         WebDriver driver = BrowserFactory.create();
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TIMEOUT_SEG));
 
