@@ -191,12 +191,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Normalizar owner a minúsculas
+        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: HIT6
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/ml-scraper:latest
-            ghcr.io/${{ github.repository_owner }}/ml-scraper:${{ github.sha }}
+            ghcr.io/${{ env.OWNER }}/ml-scraper:latest
+            ghcr.io/${{ env.OWNER }}/ml-scraper:${{ github.sha }}
 
