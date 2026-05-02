@@ -25,7 +25,7 @@ El cluster la descarga automáticamente — no hace falta construirla ni importa
 
 - **Docker Desktop** instalado y corriendo.
 - **k3d** instalado (`winget install k3d` en Windows, o descarga desde [github.com/k3d-io/k3d](https://github.com/k3d-io/k3d/releases)).
-- **kubectl** instalado (`winget install kubectl` o `choco install kubernetes-cli`).
+- **kubectl** instalado (`winget  install kubectl` o `choco install kubernetes-cli`).
 
 ---
 
