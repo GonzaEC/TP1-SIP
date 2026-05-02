@@ -375,6 +375,9 @@ secrets-scan
 - `output-json-docker-{browser}` — JSONs generados por el scraper en Docker (7 días)
 - `screenshots-docker-{browser}` — screenshots del scraper en Docker (7 días)
 
+> [!NOTE]
+> El job `docker-scraper` puede fallar en **Firefox** (artefactos vacíos) porque MercadoLibre bloquea sesiones de Geckodriver desde IPs de datacenter redirigiendo a una página de verificación de cuenta. Chrome evade este bloqueo gracias a flags extra de anti-detección (`--disable-blink-features=AutomationControlled`, `--headless=new`). El job tiene `continue-on-error: true` para que no rompa el pipeline — es comportamiento esperado. Ver [ADR 0006](docs/adr/0006-deteccion-anti-bot-chrome-vs-firefox.md) para el análisis técnico.
+
 ---
 
 #### Pre-commit hooks locales
