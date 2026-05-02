@@ -2,111 +2,109 @@
 
 Despliegue del scraper del [HIT 6](../HIT6/README.md) en un cluster Kubernetes (k3s/k3d) usando recursos nativos de batch: Job, CronJob, ConfigMap y PersistentVolumeClaim.
 
----
-
-## Pre-requisitos
-
-1. **Tener un cluster k3s o k3d funcional.**
-   - **Opción A — k3s nativo (Linux / WSL2):**
-     ```bash
-     curl -sfL https://get.k3s.io | sh -
-     sudo k3s kubectl get nodes
-     ```
-   - **Opción B — k3d (cualquier SO con Docker):**
-     ```bash
-     # Instalar k3d (ej: Windows con chocolatey)
-     choco install k3d
-
-     # Crear cluster
-     k3d cluster create scraper
-
-     # Verificar
-     kubectl get nodes
-     ```
-
-2. **Tener la imagen Docker `ml-scraper:latest` construida.**
-   ```bash
-   cd HIT6
-   docker build -t ml-scraper:latest .
-   ```
-
-3. **Tener `kubectl` instalado** (viene con k3s, o se instala por separado).
+La imagen Docker está publicada públicamente en GitHub Container Registry:
+```
+ghcr.io/gonzaec/ml-scraper:latest
+```
+El cluster la descarga automáticamente — no hace falta construirla ni importarla manualmente.
 
 ---
 
-## Estructura de manifiestos (`HIT7/k8s/`)
+## Manifiestos (`HIT7/k8s/`)
 
 | Archivo | Qué hace |
 |---|---|
 | `configmap.yaml` | Variables de entorno: `BROWSER`, `HEADLESS`, `LOG_LEVEL`, lista de `PRODUCTS` |
-| `pvc.yaml` | Solicita 1 GB de almacenamiento persistente (`local-path`) |
+| `pvc.yaml` | Solicita 1 GB de almacenamiento persistente (`storageClassName: local-path`) |
 | `job.yaml` | Ejecuta el scraper **una vez** y guarda resultados en el PVC |
-| `cronjob.yaml` | Ejecuta el scraper **cada hora** (`0 * * * *`) con histórico |
+| `cronjob.yaml` | Ejecuta el scraper **cada hora** (`0 * * * *`) con histórico de 3 ejecuciones exitosas |
 
 ---
 
-## Recetario de ejecución
+## Pre-requisitos
 
-### 1. Cargar la imagen en el cluster
+- **Docker Desktop** instalado y corriendo.
+- **k3d** instalado (`winget install k3d` en Windows, o descarga desde [github.com/k3d-io/k3d](https://github.com/k3d-io/k3d/releases)).
+- **kubectl** instalado (`winget install kubectl` o `choco install kubernetes-cli`).
 
-**Si usás k3s nativo:**
+---
+
+## Setup del cluster (una sola vez)
+
 ```bash
-docker save ml-scraper:latest -o ml-scraper.tar
-sudo k3s ctr images import ml-scraper.tar
-rm ml-scraper.tar
+# Crear cluster k3d
+k3d cluster create scraper
+
+# Verificar que está funcionando
+kubectl get nodes
+# NAME                   STATUS   ROLES                  AGE
+# k3d-scraper-server-0   Ready    control-plane,master   10s
 ```
 
-**Si usás k3d:**
-```bash
-k3d image import ml-scraper:latest -c scraper
-```
+> **Windows:** si `kubectl get nodes` devuelve error de conexión, ejecutá:
+> ```powershell
+> kubectl config set-cluster k3d-scraper --server=https://127.0.0.1:<PUERTO>
+> ```
+> El puerto lo ves en la salida de `k3d cluster create scraper` o con `docker ps`.
 
-### 2. Aplicar todos los manifiestos
+---
+
+## Despliegue
 
 ```bash
+# Aplicar todos los manifiestos (desde la raíz del repo)
 kubectl apply -f HIT7/k8s/
-```
 
-Esto crea el ConfigMap, el PVC, el Job y el CronJob.
-
-### 3. Verificar que todo se creó
-
-```bash
+# Verificar que se crearon
 kubectl get configmap scraper-config
 kubectl get pvc scraper-output
 kubectl get jobs
 kubectl get cronjobs
 ```
 
-### 4. Disparar / observar el Job one-off
+---
+
+## Verificar ejecución del Job
 
 ```bash
-# Ver pods del Job
+# Ver estado del pod
 kubectl get pods -l job-name=scraper-once
 
-# Seguir logs en tiempo real
+# Seguir los logs en tiempo real
 kubectl logs -l job-name=scraper-once -f
 ```
 
-### 5. Verificar que los JSONs quedaron en el PVC
-
-```bash
-# Encontrar el Pod que corrió el Job
-POD_NAME=$(kubectl get pod -l job-name=scraper-once -o jsonpath='{.items[0].metadata.name}')
-
-# Listar archivos generados
-kubectl exec -it $POD_NAME -- ls -la /app/output
-kubectl exec -it $POD_NAME -- ls -la /app/screenshots
+Salida esperada:
+```
+[PROCESS] Iniciando: bicicleta rodado 29
+[SUCCESS] JSON: /app/output/bicicleta_rodado_29.json
+[PROCESS] Iniciando: iPhone 16 Pro Max
+[SUCCESS] JSON: /app/output/iphone_16_pro_max.json
+[PROCESS] Iniciando: GeForce RTX 5090
+[SUCCESS] JSON: /app/output/geforce_rtx_5090.json
 ```
 
-### 6. Verificar el CronJob
+---
+
+## Verificar el CronJob
 
 ```bash
-# Ver estado del cron
 kubectl get cronjob scraper-hourly
+# NAME              SCHEDULE    SUSPEND   ACTIVE   LAST SCHEDULE
+# scraper-hourly    0 * * * *   False     0        <none>
 
-# Ver jobs creados por el cron (aparecen cada hora)
+# Monitorear jobs creados por el cron (aparecen cada hora)
 kubectl get jobs --watch
+```
+
+---
+
+## Personalizar configuración
+
+Para cambiar el browser, los productos u otras variables, editá `HIT7/k8s/configmap.yaml` y reaplicá:
+
+```bash
+kubectl apply -f HIT7/k8s/configmap.yaml
 ```
 
 ---
@@ -114,15 +112,28 @@ kubectl get jobs --watch
 ## Limpieza
 
 ```bash
-# Borrar todos los recursos creados
+# Borrar todos los recursos del cluster (no borra el cluster en sí)
 kubectl delete -f HIT7/k8s/
+
+# Borrar el cluster completo
+k3d cluster delete scraper
 ```
 
 ---
 
-## Notas
+## Solución de problemas
 
-- El scraper lee la lista de productos desde la variable de entorno `PRODUCTS` (multilínea). Si no está definida, usa los 3 productos por defecto.
-- El PVC usa `storageClassName: local-path` que viene pre-instalado en k3s. No hace falta crear ningún StorageClass manualmente.
-- Ambos Job y CronJob comparten el mismo PVC, por lo que los outputs se acumulan en el mismo volumen.
-- Si querés cambiar el browser o los productos, editá `HIT7/k8s/configmap.yaml` y hacé `kubectl apply -f HIT7/k8s/configmap.yaml`.
+| Síntoma | Causa probable | Solución |
+|---|---|---|
+| `ImagePullBackOff` | La imagen no es pública o la URL está mal | Verificar que `ghcr.io/gonzaec/ml-scraper` sea público en GitHub Packages |
+| `kubectl get nodes` da error de conexión | Hostname `host.docker.internal` no resuelve | `kubectl config set-cluster k3d-scraper --server=https://127.0.0.1:<PUERTO>` |
+| Job en estado `Failed` | Mercado Libre bloqueó el scraping desde esa IP | Revisar logs con `kubectl logs -l job-name=scraper-once`; es esperado desde IPs de datacenter |
+| PVC en `Pending` | Falta el StorageClass `local-path` | Solo ocurre fuera de k3s/k3d; en k3d viene preinstalado |
+
+---
+
+## Notas de diseño
+
+- `imagePullPolicy: Always` garantiza que k8s use siempre la imagen más reciente del registry.
+- El PVC es compartido entre Job y CronJob: los outputs se acumulan en el mismo volumen.
+- El CI publica automáticamente una nueva versión de la imagen en `ghcr.io` en cada push a `main`.

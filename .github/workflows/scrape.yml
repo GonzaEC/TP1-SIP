@@ -88,14 +88,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: 'v1.30.0'
-
-      - name: Validar manifiestos YAML (dry-run)
+      - name: Instalar kubeconform
         run: |
-          kubectl apply --dry-run=client --validate=false -f HIT7/k8s/
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+            | tar xz -C /usr/local/bin kubeconform
+
+      - name: Validar manifiestos YAML
+        run: |
+          kubeconform -strict -summary HIT7/k8s/
 
   # ── Job 3: Docker build + scraper headless en contenedor ───────────────────
   docker-scraper:

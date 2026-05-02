@@ -318,16 +318,19 @@ El workflow `.github/workflows/scrape.yml` corre automáticamente en cada push y
 
 ```
 secrets-scan
-    └── unit-tests (chrome) ──┐
-    └── unit-tests (firefox) ─┴── docker-scraper (chrome)
-                                  docker-scraper (firefox)
+    └── unit-tests (chrome) ──┬── k8s-validate ──┬── publish-image  (solo main)
+    └── unit-tests (firefox) ─┘                  │
+                               └── docker-scraper (chrome)
+                                   docker-scraper (firefox)
 ```
 
 | Job | Qué hace | Cuándo corre |
 |---|---|---|
 | `secrets-scan` | Gitleaks sobre todo el historial | Siempre |
 | `unit-tests` | `mvn verify` + JaCoCo ≥ 70 % en matriz chrome/firefox | Siempre |
+| `k8s-validate` | `kubectl apply --dry-run` sobre los YAMLs de HIT7 | Si unit-tests pasa |
 | `docker-scraper` | `docker build` + `docker run` headless en matriz chrome/firefox | Si unit-tests pasa |
+| `publish-image` | Publica `ml-scraper` en `ghcr.io/gonzaec/ml-scraper` | Solo en push a `main` |
 
 **Artifacts publicados por el pipeline:**
 - `jacoco-report-{browser}` — reporte HTML de cobertura (14 días)
@@ -383,22 +386,18 @@ Orquesta el scraper en un cluster k3s/k3d usando recursos nativos de Kubernetes 
 - **Job** (`HIT7/k8s/job.yaml`): ejecuta el scraper **una vez** y persiste outputs.
 - **CronJob** (`HIT7/k8s/cronjob.yaml`): ejecuta el scraper **cada hora** (`0 * * * *`).
 
+La imagen Docker está publicada en GitHub Container Registry y es descargada automáticamente por el cluster:
+
 ```bash
-# 1. Construir imagen
-cd HIT6 && docker build -t ml-scraper:latest .
-
-# 2. Cargar en k3s
-sudo k3s ctr images import ml-scraper.tar
-
-# 3. Aplicar manifiestos
+# La imagen se descarga sola — no hace falta docker build ni image import
 kubectl apply -f HIT7/k8s/
-
-# 4. Verificar
 kubectl logs -l job-name=scraper-once -f
 kubectl get cronjobs
 ```
 
-Documentación completa en [`HIT7/README.md`](HIT7/README.md).
+El pipeline de CI publica automáticamente una nueva versión de la imagen en cada push a `main`.
+
+Documentación completa (setup del cluster, troubleshooting, limpieza) en [`HIT7/README.md`](HIT7/README.md).
 
 ---
 
