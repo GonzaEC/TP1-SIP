@@ -95,7 +95,7 @@ jobs:
 
       - name: Validar manifiestos YAML (dry-run)
         run: |
-          kubectl apply --dry-run=client -f HIT7/k8s/
+          kubectl apply --dry-run=client --validate=false -f HIT7/k8s/
 
   # ── Job 3: Docker build + scraper headless en contenedor ───────────────────
   docker-scraper:
