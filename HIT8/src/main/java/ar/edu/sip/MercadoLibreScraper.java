@@ -156,7 +156,7 @@ public class MercadoLibreScraper {
       wait.until(ExpectedConditions.presenceOfElementLocated(Selectors.CONTENEDOR_RESULTADOS));
       return true;
     } catch (Exception e) {
-      System.out.println("[INFO] No hay siguiente página: " + e.getMessage());
+      System.out.println("[INFO] No hay siguiente página.");
       return false;
     }
   }
