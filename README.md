@@ -60,8 +60,8 @@ TP1-SIP/
 ├── HIT1/   → Scraper básico con Chrome
 ├── HIT2/   → Browser Factory (Chrome y Firefox)
 ├── HIT3/   → Filtros por DOM + Screenshot
-├── HIT4/   → (próximamente)
-├── HIT5/   → (próximamente)
+├── HIT4/   → Extracción multi-producto y JSON
+├── HIT5/   → Robustez, reintentos y módulo Selectors
 ├── HIT6/
 │   ├── checkstyle.xml              ← Reglas de estilo Java
 │   ├── Dockerfile                  ← Multi-stage: builder + runtime con Chrome y Firefox
@@ -98,7 +98,8 @@ TP1-SIP/
 
 ## Hits implementados
 
-> [NOTE!] Antes de pushear aplicar: `mvn spotless:apply`y `mvn clean validate`
+> [!NOTE]
+> Antes de pushear aplicar: `mvn spotless:apply` y `mvn clean validate`
 
 ### HIT 1 — Scraper básico con Chrome
 **Carpeta:** `HIT1/`
@@ -145,6 +146,40 @@ Además captura un screenshot de la página filtrada y lo guarda en `HIT3/screen
 cd HIT3
 mvn compile exec:java
 mvn compile exec:java -Dbrowser=firefox
+```
+
+---
+
+### HIT 4 — Extracción multi-producto y JSON
+**Carpeta:** `HIT4/`
+
+Generaliza el scraper para procesar los tres productos objetivo en una misma ejecución y guardar los resultados en archivos JSON estructurados.
+
+**Campos extraídos por ítem:** `titulo`, `precio` (Long ARS), `link`, `tienda_oficial`, `envio_gratis`, `cuotas_sin_interes`.
+
+```bash
+cd HIT4
+mvn compile exec:java                     # Chrome (default)
+mvn compile exec:java -Dbrowser=firefox   # Firefox
+```
+
+Los JSONs se generan en `HIT4/output/<producto>.json` y los screenshots en `HIT4/screenshots/`.
+
+---
+
+### HIT 5 — Robustez, reintentos y módulo Selectors
+**Carpeta:** `HIT5/`
+
+Incorpora manejo de errores granular y un módulo centralizado de selectores.
+
+- **`Selectors.java`**: todos los selectores CSS/XPath en una sola clase; actualizarlos ante cambios de layout de MercadoLibre no requiere tocar la lógica de negocio.
+- **Reintentos automáticos**: hasta 3 intentos por producto ante cualquier excepción, sin `Thread.sleep()`.
+- **Helpers `tryGetText` / `tryGetLong`**: campos opcionales retornan `null` en vez de propagar `NoSuchElementException`.
+
+```bash
+cd HIT5
+mvn compile exec:java                     # Chrome (default)
+mvn compile exec:java -Dbrowser=firefox   # Firefox
 ```
 
 ---

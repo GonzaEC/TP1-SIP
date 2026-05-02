@@ -54,11 +54,9 @@ jobs:
         if: matrix.browser == 'chrome'
         uses: browser-actions/setup-chrome@v1
 
-      - name: Install Firefox
+      - name: Set up Firefox
         if: matrix.browser == 'firefox'
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y firefox
+        uses: browser-actions/setup-firefox@v1
 
       - name: Build & Test con cobertura
         working-directory: HIT6
@@ -166,11 +164,9 @@ jobs:
         if: matrix.browser == 'chrome'
         uses: browser-actions/setup-chrome@v1
 
-      - name: Install Firefox
+      - name: Set up Firefox
         if: matrix.browser == 'firefox'
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y firefox
+        uses: browser-actions/setup-firefox@v1
 
       - name: E2E Tests contra MercadoLibre
         working-directory: HIT6
