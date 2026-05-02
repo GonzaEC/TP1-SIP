@@ -46,29 +46,21 @@ public class MercadoLibreScraper {
 
     private static void ejecutarConReintentos(WebDriver driver, WebDriverWait wait, String producto, String browser) {
         int intento = 1;
-        int delay = 2000;
 
         while (intento <= MAX_REINTENTOS) {
             try {
                 procesarProducto(driver, wait, producto, browser);
-                return; // Éxito, salir del bucle
+                return;
             } catch (Exception e) {
-                System.err.printf("[ERROR] Fallo en intento %d/%d para '%s' (%s): %s%n", 
+                System.err.printf("[ERROR] Fallo en intento %d/%d para '%s' (%s): %s%n",
                                   intento, MAX_REINTENTOS, producto, browser, e.getMessage());
-                
+
                 if (intento == MAX_REINTENTOS) {
                     System.err.println("[CRITICAL] Se agotaron los reintentos para: " + producto);
                     break;
                 }
 
-                try {
-                    System.out.println("[RETRY] Esperando " + (delay / 1000) + "s antes de reintentar...");
-                    Thread.sleep(delay);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                }
-                
-                delay *= 2; // Backoff exponencial
+                System.out.println("[RETRY] Reintentando...");
                 intento++;
             }
         }

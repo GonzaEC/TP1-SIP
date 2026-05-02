@@ -27,17 +27,6 @@ public class MercadoLibreScraper {
         "a.ui-search-link__title-card"
     };
 
-    /*
-     * XPath para encontrar un filtro por su texto visible dentro del panel lateral.
-     * MercadoLibre envuelve el texto en <span> dentro de <a>, por lo que se busca
-     * normalize-space() tanto en el <a> directo como en sus descendientes <span>.
-     */
-    private static final String XPATH_FILTRO =
-        "//li[contains(@class,'ui-search-filter-dt-title') or contains(@class,'ui-search-filter-container')]" +
-        "//a[normalize-space()='%s' or .//span[normalize-space()='%s']]" +
-        " | " +
-        "//div[contains(@class,'ui-search-filter')]//a[normalize-space()='%s' or .//span[normalize-space()='%s']]";
-
     public static void main(String[] args) throws IOException {
         String browserName = BrowserFactory.resolveName(null);
         WebDriver driver   = BrowserFactory.create(browserName);

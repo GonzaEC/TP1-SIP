@@ -75,6 +75,7 @@ public class MercadoLibreScraper {
         } finally {
             driver.quit();
         }
+        System.exit(0);
     }
 
     private static List<WebElement> buscarTitulos(WebDriver driver) {
