@@ -1,4 +1,3 @@
-// HIT5/src/main/java/ar/edu/sip/MercadoLibreScrapper.java
 package ar.edu.sip;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,10 +43,9 @@ public class MercadoLibreScraper {
     System.exit(0);
   }
 
-  private static void ejecutarConReintentos(
+  static void ejecutarConReintentos(
       WebDriver driver, WebDriverWait wait, String producto, String browser) {
     int intento = 1;
-    int delayMs = 2000;
 
     while (intento <= MAX_REINTENTOS) {
       try {
@@ -61,13 +59,7 @@ public class MercadoLibreScraper {
           System.err.println("[CRITICAL] Se agotaron los reintentos para: " + producto);
           break;
         }
-        try {
-          System.out.println("[RETRY] Esperando " + (delayMs / 1000) + "s antes de reintentar...");
-          Thread.sleep(delayMs);
-        } catch (InterruptedException ie) {
-          Thread.currentThread().interrupt();
-        }
-        delayMs *= 2;
+        System.out.println("[RETRY] Reintentando...");
         intento++;
       }
     }

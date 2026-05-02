@@ -438,4 +438,57 @@ class MercadoLibreScraperTest {
     // Verificamos que se llamó al executeScript de JS
     verify((JavascriptExecutor) jsDriver, atLeastOnce()).executeScript(anyString(), eq(enlace));
   }
+
+  // ── aplicarOrden ──────────────────────────────────────────────────────────
+
+  @Test
+  void aplicarOrdenExitosoEjecutaClickEnOpcion() {
+    WebDriver jsDriver =
+        mock(WebDriver.class, withSettings().extraInterfaces(JavascriptExecutor.class));
+    WebElement boton = mock(WebElement.class);
+    WebElement opcion = mock(WebElement.class);
+    when(wait.until(any()))
+        .thenReturn(boton)
+        .thenReturn(mock(WebElement.class))
+        .thenReturn(opcion)
+        .thenReturn(mock(WebElement.class));
+
+    assertDoesNotThrow(
+        () -> MercadoLibreScraper.aplicarOrden(jsDriver, wait, "relevantes", "test"));
+
+    verify((JavascriptExecutor) jsDriver, atLeastOnce()).executeScript(anyString(), eq(opcion));
+  }
+
+  @Test
+  void aplicarOrdenFallaSilenciosamenteCuandoNoHayDropdown() {
+    WebDriver jsDriver =
+        mock(WebDriver.class, withSettings().extraInterfaces(JavascriptExecutor.class));
+    when(wait.until(any())).thenThrow(new TimeoutException("no dropdown"));
+
+    assertDoesNotThrow(
+        () -> MercadoLibreScraper.aplicarOrden(jsDriver, wait, "relevantes", "test"));
+  }
+
+  // ── cerrarBannerCookies con botón visible ─────────────────────────────────
+
+  @Test
+  void cerrarBannerCookiesConBotonVisibleHaceClick() {
+    WebElement boton = mock(WebElement.class);
+    when(driver.findElement(Selectors.BANNER_COOKIES)).thenReturn(boton);
+    when(boton.isDisplayed()).thenReturn(true);
+
+    assertDoesNotThrow(() -> MercadoLibreScraper.cerrarBannerCookies(driver));
+
+    verify(boton).click();
+  }
+
+  // ── ejecutarConReintentos ────────────────────────────────────────────────
+
+  @Test
+  void ejecutarConReintentosAgotaReintentosYNoLanzaExcepcion() {
+    when(wait.until(any())).thenThrow(new TimeoutException("fallo simulado"));
+
+    assertDoesNotThrow(
+        () -> MercadoLibreScraper.ejecutarConReintentos(driver, wait, "test", "chrome"));
+  }
 }

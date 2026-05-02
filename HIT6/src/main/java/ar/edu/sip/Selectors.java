@@ -1,4 +1,3 @@
-// HIT5/src/main/java/ar/edu/sip/Selectors.java
 package ar.edu.sip;
 
 import org.openqa.selenium.By;

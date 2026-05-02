@@ -12,8 +12,9 @@ WORKDIR /build
 COPY pom.xml .
 RUN mvn dependency:go-offline -q
 
-# Copiar fuentes y compilar (se saltean los tests: se corren en CI)
+# Copiar fuentes + reglas de Checkstyle (el plugin las necesita en fase validate)
 COPY src ./src
+COPY checkstyle.xml ./checkstyle.xml
 RUN mvn package -DskipTests -q
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -30,68 +31,48 @@ ENV BROWSER=chrome \
 
 WORKDIR /app
 
-# ── Instalar dependencias del sistema ────────────────────────────────────────
+# ── Utilidades base + Xvfb (por si se necesita modo no-headless en el futuro) ─
 RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends \
-        # Xvfb por si se necesita modo no-headless en el futuro
-        xvfb \
-        # Utilidades de red
-        curl \
-        wget \
-        unzip \
         ca-certificates \
-        fonts-liberation \
-        libasound2 \
-        libatk-bridge2.0-0 \
-        libatk1.0-0 \
-        libcups2 \
-        libdbus-1-3 \
-        libgdk-pixbuf2.0-0 \
-        libnspr4 \
-        libnss3 \
-        libx11-6 \
-        libxcomposite1 \
-        libxdamage1 \
-        libxext6 \
-        libxfixes3 \
-        libxrandr2 \
-        libxss1 \
-        libxtst6 \
-        xdg-utils \
+        curl \
+        gnupg \
+        wget \
+        xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Instalar Google Chrome (versión estable fija) ────────────────────────────
-RUN CHROME_VERSION="124.0.6367.91-1" && \
-    wget -q "https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}_amd64.deb" \
-        -O /tmp/chrome.deb && \
-    apt-get install -y /tmp/chrome.deb && \
-    rm /tmp/chrome.deb && \
+# ── Instalar Google Chrome stable desde el repositorio APT oficial ───────────
+# Usar el repo APT en vez del .deb directo para que apt resuelva todas las
+# dependencias automáticamente (libgbm1, libgtk-3-0, libvulkan1, etc.) y para
+# evitar 404s del pool/main cuando Google saca versiones viejas.
+# El driver (chromedriver) lo resuelve Selenium Manager en runtime contra la
+# versión exacta de Chrome instalada, así nos evitamos el version-matching.
+RUN wget -q -O /usr/share/keyrings/google-chrome.asc \
+        "https://dl.google.com/linux/linux_signing_key.pub" && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.asc] http://dl.google.com/linux/chrome/deb/ stable main" \
+        > /etc/apt/sources.list.d/google-chrome.list && \
+    apt-get update -qq && \
+    apt-get install -y --no-install-recommends google-chrome-stable && \
     rm -rf /var/lib/apt/lists/*
 
-# ── Instalar ChromeDriver (versión compatible con Chrome 124) ────────────────
-RUN CHROMEDRIVER_VERSION="124.0.6367.91" && \
-    wget -q "https://storage.googleapis.com/chrome-for-testing-public/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip" \
-        -O /tmp/chromedriver.zip && \
-    unzip -q /tmp/chromedriver.zip -d /tmp && \
-    mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
-    chmod +x /usr/local/bin/chromedriver && \
-    rm -rf /tmp/chromedriver.zip /tmp/chromedriver-linux64
-
-# ── Instalar Firefox ESR (versión LTS estable) ───────────────────────────────
-RUN apt-get update -qq && \
-    apt-get install -y --no-install-recommends firefox-esr && \
+# ── Instalar Firefox desde el repositorio APT oficial de Mozilla ─────────────
+# Ubuntu 22.04 movió Firefox a snap (no funciona en containers) y sacó
+# `firefox-esr` del repo principal. Mozilla mantiene su propio repo APT en
+# packages.mozilla.org, que es la fuente recomendada para containers.
+# geckodriver lo resuelve Selenium Manager en runtime.
+RUN install -d -m 0755 /etc/apt/keyrings && \
+    wget -q -O- https://packages.mozilla.org/apt/repo-signing-key.gpg \
+        | tee /etc/apt/keyrings/packages.mozilla.org.asc > /dev/null && \
+    echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main" \
+        > /etc/apt/sources.list.d/mozilla.list && \
+    printf 'Package: *\nPin: origin packages.mozilla.org\nPin-Priority: 1000\n' \
+        > /etc/apt/preferences.d/mozilla && \
+    apt-get update -qq && \
+    apt-get install -y --no-install-recommends firefox && \
     rm -rf /var/lib/apt/lists/*
-
-# ── Instalar GeckoDriver (para Firefox) ─────────────────────────────────────
-RUN GECKODRIVER_VERSION="0.34.0" && \
-    wget -q "https://github.com/mozilla/geckodriver/releases/download/v${GECKODRIVER_VERSION}/geckodriver-v${GECKODRIVER_VERSION}-linux64.tar.gz" \
-        -O /tmp/geckodriver.tar.gz && \
-    tar -xzf /tmp/geckodriver.tar.gz -C /usr/local/bin && \
-    chmod +x /usr/local/bin/geckodriver && \
-    rm /tmp/geckodriver.tar.gz
 
 # ── Copiar el jar generado en el stage builder ───────────────────────────────
-COPY --from=builder /build/target/hit5-scraper-1.0-SNAPSHOT.jar /app/scraper.jar
+COPY --from=builder /build/target/hit6-scraper-1.0-SNAPSHOT.jar /app/scraper.jar
 
 # ── Directorios de salida (montados desde el host) ───────────────────────────
 RUN mkdir -p /app/output /app/screenshots

@@ -1,4 +1,3 @@
-// HIT5/src/main/java/ar/edu/sip/ProductResult.java
 package ar.edu.sip;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
