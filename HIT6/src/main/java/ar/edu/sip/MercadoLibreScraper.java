@@ -192,7 +192,7 @@ public class MercadoLibreScraper {
       WebElement boton =
           wait.until(ExpectedConditions.elementToBeClickable(Selectors.DROPDOWN_ORDEN));
 
-      boton.click();
+      ((JavascriptExecutor) driver).executeScript("arguments[0].click();", boton);
 
       wait.until(ExpectedConditions.visibilityOfElementLocated(Selectors.LISTBOX_ORDEN));
 

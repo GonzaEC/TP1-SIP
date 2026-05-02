@@ -13,8 +13,10 @@ public class BrowserFactory {
   private BrowserFactory() {}
 
   // Definicion explicita de user agents para prevenir error en Mercado Libre
-  private static final String USER_AGENT =
-      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+  private static final String CHROME_USER_AGENT =
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+  private static final String FIREFOX_USER_AGENT =
+      "Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0";
 
   public static WebDriver create(String browserName) {
     return create(browserName, resolveHeadless());
@@ -82,7 +84,7 @@ public class BrowserFactory {
     opts.addArguments("--disable-blink-features=AutomationControlled");
 
     // Workaround para evitar empty-state en MercadoLibre
-    opts.addArguments("--user-agent=" + USER_AGENT);
+    opts.addArguments("--user-agent=" + CHROME_USER_AGENT);
 
     if (headless) {
       opts.addArguments(
@@ -98,7 +100,7 @@ public class BrowserFactory {
     opts.addPreference("useAutomationExtension", false);
 
     // Workaround para evitar empty-state en MercadoLibre
-    opts.addArguments("--user-agent=" + USER_AGENT);
+    opts.addArguments("--user-agent=" + FIREFOX_USER_AGENT);
 
     if (headless) {
       opts.addArguments("--headless", "--width=1920", "--height=1080");
