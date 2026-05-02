@@ -1,4 +1,4 @@
-name: HIT6 – Scraper CI
+name: Scraper CI
 
 on:
   push:
@@ -93,9 +93,13 @@ jobs:
           curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
             | tar xz -C /usr/local/bin kubeconform
 
-      - name: Validar manifiestos YAML
+      - name: Validar manifiestos HIT7
         run: |
           kubeconform -strict -summary HIT7/k8s/
+
+      - name: Validar manifiestos HIT8
+        run: |
+          kubeconform -strict -summary HIT8/k8s/
 
   # ── Job 3: Docker build + scraper headless en contenedor ───────────────────
   docker-scraper:
@@ -166,7 +170,62 @@ jobs:
           path: HIT6/screenshots/
           retention-days: 7
 
-  # ── Job 4: Publicar imagen en ghcr.io (solo en push a main) ───────────────
+  # ── Job 4: Tests unitarios HIT8 + cobertura ───────────────────────────────
+  unit-tests-hit8:
+    name: HIT8 Unit Tests (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    needs: secrets-scan
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome, firefox]
+
+    env:
+      BROWSER:      ${{ matrix.browser }}
+      HEADLESS:     "true"
+      INTEGRATION:  "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Set up Chrome
+        if: matrix.browser == 'chrome'
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Set up Firefox
+        if: matrix.browser == 'firefox'
+        uses: browser-actions/setup-firefox@v1
+
+      - name: Build & Test HIT8 con cobertura
+        working-directory: HIT8
+        run: mvn --batch-mode verify -Dbrowser=${{ matrix.browser }}
+
+      - name: Upload JaCoCo HTML report HIT8
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report-hit8-${{ matrix.browser }}
+          path: HIT8/target/site/jacoco/
+          retention-days: 14
+
+      - name: Upload Surefire XML results HIT8
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-results-hit8-${{ matrix.browser }}
+          path: HIT8/target/surefire-reports/
+          retention-days: 7
+
+  # ── Job 5: Publicar imagen HIT6 en ghcr.io (solo en push a main) ──────────
   publish-image:
     name: Publish image to ghcr.io
     runs-on: ubuntu-latest
@@ -194,7 +253,7 @@ jobs:
       - name: Normalizar owner a minúsculas
         run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      - name: Build and push
+      - name: Build and push HIT6
         uses: docker/build-push-action@v6
         with:
           context: HIT6
@@ -202,4 +261,41 @@ jobs:
           tags: |
             ghcr.io/${{ env.OWNER }}/ml-scraper:latest
             ghcr.io/${{ env.OWNER }}/ml-scraper:${{ github.sha }}
+
+  # ── Job 6: Publicar imagen HIT8 en ghcr.io (solo en push a main) ──────────
+  publish-image-hit8:
+    name: Publish HIT8 image to ghcr.io
+    runs-on: ubuntu-latest
+    needs: [unit-tests-hit8, k8s-validate]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Normalizar owner a minúsculas
+        run: echo "OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Build and push HIT8
+        uses: docker/build-push-action@v6
+        with:
+          context: HIT8
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/ml-scraper-hit8:latest
+            ghcr.io/${{ env.OWNER }}/ml-scraper-hit8:${{ github.sha }}
 

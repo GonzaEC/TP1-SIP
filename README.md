@@ -18,6 +18,39 @@ Scraper multi-browser de MercadoLibre Argentina construido de forma incremental 
 
 ---
 
+## Prerrequisitos cumplidos (TP 0)
+
+Checklist obligatorio previo al Hit #7 — evidencia de cada checkpoint:
+
+### 1. `kubectl get nodes` devuelve nodo en Ready
+
+![kubectl get nodes](TP0/get-nodes.png)
+
+### 2. nginx-test corrió y responde en `curl localhost:8080`
+
+![port-forward nginx](TP0/localhost-8080.png)
+![curl localhost:8080](TP0/curl-localhost8080.png)
+
+### 3. Sé importar una imagen Docker al cluster
+
+```bash
+k3d image import ml-scraper:latest -c scraper
+```
+
+![k3d image import](TP0/imagen-k3.png)
+
+### 4. Entiendo Pod, Job, CronJob, ConfigMap y PVC
+
+| Concepto | Para qué sirve |
+|---|---|
+| **Pod** | Unidad mínima de ejecución en k8s — uno o más containers que comparten red y storage |
+| **Job** | Tarea batch que corre hasta completarse una vez (one-off) |
+| **CronJob** | Lanza Jobs según una expresión cron (ej: `0 * * * *` = cada hora) |
+| **ConfigMap** | Almacena configuración no-sensible (env vars) y la inyecta a los pods sin tocar la imagen |
+| **PVC** | Pedido de almacenamiento persistente que sobrevive a reinicios del pod |
+
+---
+
 ## Descripción general
 
 El objetivo del TP es construir, hit a hit, un scraper que busque productos en MercadoLibre AR, aplique filtros y extraiga resultados de forma estructurada. Cada hit agrega funcionalidad sobre el anterior.
@@ -82,7 +115,9 @@ TP1-SIP/
 │           └── ProductResultSchemaTest.java
 ├── HIT7/   → Orquestación con Kubernetes (k3s Job + CronJob + ConfigMap + PVC)
 │   └── k8s/                    ← Manifiestos Kubernetes (ConfigMap, PVC, Job, CronJob)
-├── HIT8/   → (pendiente)
+├── HIT8/   → Capacidad extendida (paginación 30 resultados, stats precio, PostgreSQL)
+│   ├── k8s/                    ← PostgreSQL StatefulSet + Secret + Job/CronJob actualizados
+│   └── src/main/resources/db/migration/  ← Migraciones Flyway
 └── docs/
     └── adr/                       ← Architecture Decision Records
         ├── 0000-template.md
@@ -109,7 +144,7 @@ TP1-SIP/
 ## Hits implementados
 
 > [!NOTE]
-> Solo HIT6 tiene Spotless + Checkstyle configurados. Antes de pushear cambios en `HIT6/`, correr desde `HIT6/`:
+> HIT6 y HIT8 tienen Spotless + Checkstyle configurados. Antes de pushear cambios, correr desde la carpeta correspondiente:
 > ```bash
 > mvn spotless:apply        # auto-formatea con google-java-format
 > mvn clean verify          # corre Checkstyle, tests, JaCoCo (≥70%)
@@ -318,19 +353,21 @@ El workflow `.github/workflows/scrape.yml` corre automáticamente en cada push y
 
 ```
 secrets-scan
-    └── unit-tests (chrome) ──┬── k8s-validate ──┬── publish-image  (solo main)
-    └── unit-tests (firefox) ─┘                  │
-                               └── docker-scraper (chrome)
-                                   docker-scraper (firefox)
+    ├── unit-tests HIT6 (chrome/firefox) ──┬── k8s-validate (HIT7+HIT8) ──┬── publish-image HIT6  (solo main)
+    │                                       │                               └── publish-image HIT8  (solo main)
+    │                                       └── docker-scraper HIT6 (chrome/firefox)
+    └── unit-tests HIT8 (chrome/firefox) ──┘
 ```
 
 | Job | Qué hace | Cuándo corre |
 |---|---|---|
 | `secrets-scan` | Gitleaks sobre todo el historial | Siempre |
-| `unit-tests` | `mvn verify` + JaCoCo ≥ 70 % en matriz chrome/firefox | Siempre |
-| `k8s-validate` | `kubectl apply --dry-run` sobre los YAMLs de HIT7 | Si unit-tests pasa |
-| `docker-scraper` | `docker build` + `docker run` headless en matriz chrome/firefox | Si unit-tests pasa |
-| `publish-image` | Publica `ml-scraper` en `ghcr.io/gonzaec/ml-scraper` | Solo en push a `main` |
+| `unit-tests` | `mvn verify` HIT6 + JaCoCo ≥ 70 % en matriz chrome/firefox | Siempre |
+| `unit-tests-hit8` | `mvn verify` HIT8 + JaCoCo ≥ 70 % en matriz chrome/firefox | Siempre |
+| `k8s-validate` | kubeconform sobre YAMLs de HIT7 y HIT8 | Si unit-tests pasa |
+| `docker-scraper` | `docker build` + `docker run` headless HIT6 en matriz chrome/firefox | Si unit-tests pasa |
+| `publish-image` | Publica `ml-scraper` (HIT6) en `ghcr.io/gonzaec/ml-scraper` | Solo en push a `main` |
+| `publish-image-hit8` | Publica `ml-scraper-hit8` en `ghcr.io/gonzaec/ml-scraper-hit8` | Solo en push a `main` |
 
 **Artifacts publicados por el pipeline:**
 - `jacoco-report-{browser}` — reporte HTML de cobertura (14 días)
@@ -398,6 +435,51 @@ kubectl get cronjobs
 El pipeline de CI publica automáticamente una nueva versión de la imagen en cada push a `main`.
 
 Documentación completa (setup del cluster, troubleshooting, limpieza) en [`HIT7/README.md`](HIT7/README.md).
+
+---
+
+### HIT 8 — Capacidad Extendida
+**Carpeta:** `HIT8/`, manifiestos en `HIT8/k8s/`
+
+Extiende el scraper con tres capacidades nuevas:
+
+#### 1. Paginación
+El scraper navega hasta **3 páginas** recolectando **10 ítems por página**, llegando a **30 resultados por producto**.
+
+```java
+static final int CANT_RESULTADOS = 30;
+static final int CANT_POR_PAGINA = 10;
+static final int MAX_PAGINAS     = 3;
+```
+
+#### 2. Estadísticas de precio
+Después de cada búsqueda se calculan y muestran: **mínimo, máximo, mediana y desvío estándar** de los precios obtenidos.
+
+```
+[STATS] iPhone 16 Pro Max
+  iPhone 16 Pro Max              | min=1.200.000 | max=2.800.000 | mediana=1.850.000 | σ=380.000 | n=27
+```
+
+#### 3. Histórico en PostgreSQL
+Los resultados y estadísticas se guardan en PostgreSQL desplegado como **StatefulSet** en k3s:
+
+- Credenciales inyectadas por **Secret** (`POSTGRES_PASSWORD`)
+- Variables de configuración por **ConfigMap** (`POSTGRES_HOST`, `POSTGRES_DB`, etc.)
+- Esquema creado por **Flyway** al primer arranque
+- Un **initContainer** garantiza que PostgreSQL esté listo antes de arrancar el scraper
+
+```bash
+kubectl apply -f HIT8/k8s/
+kubectl logs -l job-name=scraper-once -f
+
+# Consultar resultados
+kubectl port-forward svc/postgres 5432:5432
+psql -h localhost -U scraper -d scraper -c "SELECT COUNT(*) FROM scrape_results;"
+```
+
+> Si `POSTGRES_HOST` no está configurado, el scraper sigue funcionando normalmente y guarda solo el JSON.
+
+Documentación completa en [`HIT8/README.md`](HIT8/README.md).
 
 ---
 
