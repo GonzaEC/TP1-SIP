@@ -17,7 +17,8 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 public class MercadoLibreScraper {
 
   private static final String URL_BASE = "https://www.mercadolibre.com.ar";
-  private static final int TIMEOUT_SEG = 15;
+  // 30s da margen para entornos con red lenta (CI runners) sin colgarse demasiado.
+  private static final int TIMEOUT_SEG = 30;
   private static final int MAX_REINTENTOS = 3;
 
   static final int CANT_RESULTADOS = 10;
@@ -75,7 +76,7 @@ public class MercadoLibreScraper {
     campo.clear();
     campo.sendKeys(producto, Keys.ENTER);
 
-    esperarResultados(wait, producto);
+    esperarResultados(driver, wait, producto);
     cerrarBannerCookies(driver);
 
     aplicarFiltro(driver, wait, "Nuevo", producto);
@@ -152,11 +153,21 @@ public class MercadoLibreScraper {
     }
   }
 
-  static void esperarResultados(WebDriverWait wait, String producto) {
+  static void esperarResultados(WebDriver driver, WebDriverWait wait, String producto) {
     try {
       wait.until(ExpectedConditions.presenceOfElementLocated(Selectors.CONTENEDOR_RESULTADOS));
     } catch (TimeoutException e) {
-      throw new TimeoutException("No cargaron resultados para '" + producto + "'");
+      // Loguear URL y title reales para diagnosticar bloqueos / captchas / cambios de DOM.
+      String url = "(no disponible)";
+      String title = "(no disponible)";
+      try {
+        url = driver.getCurrentUrl();
+        title = driver.getTitle();
+      } catch (Exception ignored) {
+        // El driver puede estar en mal estado; no romper el log
+      }
+      throw new TimeoutException(
+          "No cargaron resultados para '" + producto + "' (url=" + url + ", title=" + title + ")");
     }
   }
 
@@ -169,7 +180,7 @@ public class MercadoLibreScraper {
           .executeScript("arguments[0].scrollIntoView({block:'center'});", enlace);
 
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", enlace);
-      esperarResultados(wait, producto);
+      esperarResultados(driver, wait, producto);
     } catch (Exception e) {
       System.err.printf(
           "[WARN] Filtro '%s' no aplicado en '%s': %s%n", texto, producto, e.getMessage());
@@ -189,7 +200,7 @@ public class MercadoLibreScraper {
           wait.until(ExpectedConditions.presenceOfElementLocated(Selectors.opcionOrden(texto)));
 
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", opcion);
-      esperarResultados(wait, producto);
+      esperarResultados(driver, wait, producto);
     } catch (Exception e) {
       System.err.printf(
           "[WARN] Orden '%s' no aplicado en '%s': %s%n", texto, producto, e.getMessage());

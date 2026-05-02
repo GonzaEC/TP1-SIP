@@ -289,7 +289,8 @@ class MercadoLibreScraperTest {
     // Simulamos que el wait falla
     when(wait.until(any())).thenThrow(new TimeoutException("Timeout simulado"));
 
-    assertThrows(TimeoutException.class, () -> MercadoLibreScraper.esperarResultados(wait, "test"));
+    assertThrows(
+        TimeoutException.class, () -> MercadoLibreScraper.esperarResultados(driver, wait, "test"));
   }
 
   @Test
