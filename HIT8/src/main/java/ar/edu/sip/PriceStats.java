@@ -3,12 +3,16 @@ package ar.edu.sip;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Calcula estadísticas de precios (mín, máx, mediana, desvío estándar) para un conjunto de
  * resultados.
  */
 public class PriceStats {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PriceStats.class);
 
   private final long min;
   private final long max;
@@ -70,12 +74,13 @@ public class PriceStats {
   /** Imprime una línea de resumen con las estadísticas del producto. */
   public void imprimirResumen(String producto) {
     if (total == 0) {
-      System.out.printf("  %-30s | sin precios disponibles%n", producto);
+      LOG.info(String.format("  %-30s | sin precios disponibles", producto));
       return;
     }
-    System.out.printf(
-        "  %-30s | min=%,d | max=%,d | mediana=%,.0f | σ=%,.0f | n=%d%n",
-        producto, min, max, mediana, desviacion, total);
+    LOG.info(
+        String.format(
+            "  %-30s | min=%,d | max=%,d | mediana=%,.0f | σ=%,.0f | n=%d",
+            producto, min, max, mediana, desviacion, total));
   }
 
   public long getMin() {

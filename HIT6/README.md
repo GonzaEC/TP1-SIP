@@ -67,6 +67,22 @@ Tres servicios:
 
 Ver `docker-compose.yml` para la config completa.
 
+### Logging estructurado (SLF4J + Logback)
+
+Reemplaza los `System.out/err.println` por logs con nivel, timestamp y nombre de clase.
+
+Configuración en `src/main/resources/logback.xml`:
+- **ConsoleAppender** — imprime en stdout con el patrón `HH:mm:ss.SSS LEVEL [logger] mensaje`
+- **RollingFileAppender** — escribe en `logs/scraper.log`, rota por tamaño (2 MB) y tiempo; conserva 3 archivos históricos (10 MB totales máximo)
+
+Ejemplo de salida:
+```
+21:30:15.123 INFO  [a.e.s.BrowserFactory] Browser: chrome | Headless: true
+21:30:16.456 INFO  [a.e.s.MercadoLibreScraper] Iniciando: bicicleta rodado 29
+21:31:05.789 WARN  [a.e.s.MercadoLibreScraper] Filtro 'Solo tiendas oficiales' no aplicado en 'bicicleta rodado 29': ...
+21:31:26.789 INFO  [a.e.s.MercadoLibreScraper] JSON guardado: /app/output/bicicleta_rodado_29.json
+```
+
 ### Pipeline CI
 
 `.github/workflows/scrape.yml` con 3 jobs en cadena:
@@ -92,6 +108,7 @@ Detalles en el [README raíz](../README.md#pipeline-ci-github-actions).
 | Orquestación | Manual | `docker-compose` (scraper, lint, test) |
 | CI | No | GitHub Actions con matriz Chrome/Firefox + Gitleaks |
 | Calidad de código | Selectors centralizado | + Spotless + Checkstyle + pre-commit hooks |
+| Logging | `System.out.println` | SLF4J + Logback con niveles, timestamp y rotación de archivo |
 
 ---
 

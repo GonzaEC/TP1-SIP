@@ -13,12 +13,16 @@ import java.util.List;
 import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Scraper de MercadoLibre con paginación (hasta 3 páginas / 30 resultados) y persistencia en
  * PostgreSQL.
  */
 public class MercadoLibreScraper {
+
+  private static final Logger LOG = LoggerFactory.getLogger(MercadoLibreScraper.class);
 
   private static final String URL_BASE = "https://www.mercadolibre.com.ar";
   private static final int TIMEOUT_SEG = 30;
@@ -52,13 +56,11 @@ public class MercadoLibreScraper {
     WebDriver driver = BrowserFactory.create(browser, headless);
     WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TIMEOUT_SEG));
 
-    System.out.println("\n╔══════════════════════════════════════════════╗");
-    System.out.println("║  MercadoLibre Scraper — HIT 8                ║");
-    System.out.println("╚══════════════════════════════════════════════╝");
+    LOG.info("MercadoLibre Scraper — HIT 8");
 
     try {
       for (String producto : productos) {
-        System.out.println("\n[PROCESS] Iniciando: " + producto);
+        LOG.info("Iniciando: {}", producto);
         ejecutarConReintentos(driver, wait, producto, browser);
       }
     } finally {
@@ -76,14 +78,18 @@ public class MercadoLibreScraper {
         procesarProducto(driver, wait, producto, browser);
         return;
       } catch (Exception e) {
-        System.err.printf(
-            "[ERROR] Fallo en intento %d/%d para '%s' (%s): %s%n",
-            intento, MAX_REINTENTOS, producto, browser, e.getMessage());
+        LOG.error(
+            "Fallo en intento {}/{} para '{}' ({}): {}",
+            intento,
+            MAX_REINTENTOS,
+            producto,
+            browser,
+            e.getMessage());
         if (intento == MAX_REINTENTOS) {
-          System.err.println("[CRITICAL] Se agotaron los reintentos para: " + producto);
+          LOG.error("Se agotaron los reintentos para: {}", producto);
           break;
         }
-        System.out.println("[RETRY] Reintentando...");
+        LOG.info("Reintentando...");
         intento++;
       }
     }
@@ -109,7 +115,7 @@ public class MercadoLibreScraper {
     List<ProductResult> resultados = extraerDatosConPaginacion(driver, wait, producto);
 
     PriceStats stats = PriceStats.calcular(resultados);
-    System.out.println("\n[STATS] " + producto);
+    LOG.info("Stats: {}", producto);
     stats.imprimirResumen(producto);
 
     guardarJson(producto, resultados);
@@ -129,9 +135,12 @@ public class MercadoLibreScraper {
     while (pagina <= MAX_PAGINAS && todos.size() < CANT_RESULTADOS) {
       List<ProductResult> paginaActual = extraerDatos(driver, producto);
       todos.addAll(paginaActual);
-      System.out.printf(
-          "[PAGINA %d] %d ítems extraídos (acumulado: %d/%d)%n",
-          pagina, paginaActual.size(), todos.size(), CANT_RESULTADOS);
+      LOG.info(
+          "Página {} — {} ítems extraídos (acumulado: {}/{})",
+          pagina,
+          paginaActual.size(),
+          todos.size(),
+          CANT_RESULTADOS);
 
       if (todos.size() >= CANT_RESULTADOS || !irSiguientePagina(driver, wait)) {
         break;
@@ -156,7 +165,7 @@ public class MercadoLibreScraper {
       wait.until(ExpectedConditions.presenceOfElementLocated(Selectors.CONTENEDOR_RESULTADOS));
       return true;
     } catch (Exception e) {
-      System.out.println("[INFO] No hay siguiente página.");
+      LOG.info("No hay siguiente página.");
       return false;
     }
   }
@@ -193,8 +202,7 @@ public class MercadoLibreScraper {
 
         lista.add(pr);
       } catch (Exception e) {
-        System.err.printf(
-            "[WARN] Error parcial en item %d de '%s': %s%n", i + 1, producto, e.getMessage());
+        LOG.warn("Error parcial en item {} de '{}': {}", i + 1, producto, e.getMessage());
       }
     }
     return lista;
@@ -254,8 +262,7 @@ public class MercadoLibreScraper {
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", enlace);
       esperarResultados(driver, wait, producto);
     } catch (Exception e) {
-      System.err.printf(
-          "[WARN] Filtro '%s' no aplicado en '%s': %s%n", texto, producto, e.getMessage());
+      LOG.warn("Filtro '{}' no aplicado en '{}': {}", texto, producto, e.getMessage());
     }
   }
 
@@ -274,8 +281,7 @@ public class MercadoLibreScraper {
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", opcion);
       esperarResultados(driver, wait, producto);
     } catch (Exception e) {
-      System.err.printf(
-          "[WARN] Orden '%s' no aplicado en '%s': %s%n", texto, producto, e.getMessage());
+      LOG.warn("Orden '{}' no aplicado en '{}': {}", texto, producto, e.getMessage());
     }
   }
 
@@ -302,7 +308,7 @@ public class MercadoLibreScraper {
         .enable(SerializationFeature.INDENT_OUTPUT)
         .writeValue(destino.toFile(), resultados);
 
-    System.out.println("[SUCCESS] JSON: " + destino.toAbsolutePath());
+    LOG.info("JSON guardado: {}", destino.toAbsolutePath());
   }
 
   static void tomarScreenshot(WebDriver driver, String producto, String browser)

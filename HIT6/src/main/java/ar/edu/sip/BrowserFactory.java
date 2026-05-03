@@ -7,8 +7,12 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BrowserFactory {
+
+  private static final Logger LOG = LoggerFactory.getLogger(BrowserFactory.class);
 
   private BrowserFactory() {}
 
@@ -24,7 +28,7 @@ public class BrowserFactory {
 
   public static WebDriver create(String browserName, boolean headless) {
     String nombre = resolveName(browserName);
-    System.out.println("[BrowserFactory] Browser: " + nombre + " | Headless: " + headless);
+    LOG.info("Browser: {} | Headless: {}", nombre, headless);
     return switch (nombre.toLowerCase()) {
       case "chrome" -> buildChrome(headless);
       case "firefox" -> buildFirefox(headless);

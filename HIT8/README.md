@@ -71,17 +71,18 @@ kubectl get pods -l job-name=scraper-once
 kubectl logs -l job-name=scraper-once -f
 ```
 
-Salida esperada del scraper:
+Salida esperada del scraper (formato SLF4J + Logback):
 
 ```
-[PROCESS] Iniciando: bicicleta rodado 29
-[PAGINA 1] 10 ítems extraídos (acumulado: 10/30)
-[PAGINA 2] 10 ítems extraídos (acumulado: 20/30)
-[PAGINA 3] 10 ítems extraídos (acumulado: 30/30)
-[STATS] bicicleta rodado 29
-  bicicleta rodado 29            | min=120.000 | max=980.000 | mediana=320.000 | σ=210.000 | n=28
-[SUCCESS] JSON: /app/output/bicicleta_rodado_29.json
-[DB] Guardados 30 resultados para 'bicicleta rodado 29'
+21:30:15.123 INFO  [a.e.s.BrowserFactory     ] Browser: chrome | Headless: true
+21:30:16.456 INFO  [a.e.s.MercadoLibreScraper] Iniciando: bicicleta rodado 29
+21:31:05.001 INFO  [a.e.s.MercadoLibreScraper] Página 1 — 10 ítems extraídos (acumulado: 10/30)
+21:31:25.234 INFO  [a.e.s.MercadoLibreScraper] Página 2 — 10 ítems extraídos (acumulado: 20/30)
+21:31:45.567 INFO  [a.e.s.MercadoLibreScraper] Página 3 — 10 ítems extraídos (acumulado: 30/30)
+21:31:46.890 INFO  [a.e.s.MercadoLibreScraper] Stats: bicicleta rodado 29
+21:31:46.891 INFO  [ar.edu.sip.PriceStats    ]   bicicleta rodado 29            | min=120.000 | max=980.000 | mediana=320.000 | σ=210.000 | n=28
+21:31:47.123 INFO  [a.e.s.MercadoLibreScraper] JSON guardado: /app/output/bicicleta_rodado_29.json
+21:31:47.456 INFO  [ar.edu.sip.PostgresWriter] Guardados 30 resultados para 'bicicleta rodado 29'
 ```
 
 ---
@@ -110,6 +111,19 @@ El archivo `src/main/resources/db/migration/V1__create_scrape_results.sql` crea 
 ```bash
 kubectl delete -f HIT8/k8s/
 ```
+
+---
+
+## Logging estructurado
+
+El scraper usa **SLF4J + Logback** (configurado en `src/main/resources/logback.xml`):
+
+| Appender | Destino | Rotación |
+|---|---|---|
+| `CONSOLE` | stdout | — |
+| `FILE` | `logs/scraper.log` | 2 MB por archivo, 3 días de historial, 10 MB totales |
+
+Todos los niveles (INFO / WARN / ERROR) llevan timestamp, nivel y nombre abreviado del logger, lo que permite filtrar en CI con `grep ERROR` o configurar alertas en Kubernetes.
 
 ---
 

@@ -6,9 +6,13 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.List;
 import org.flywaydb.core.Flyway;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Persiste resultados de scraping en PostgreSQL usando Flyway para migraciones. */
 public class PostgresWriter {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PostgresWriter.class);
 
   private PostgresWriter() {}
 
@@ -35,7 +39,7 @@ public class PostgresWriter {
    */
   public static void guardar(String producto, List<ProductResult> resultados, PriceStats stats) {
     if (!isConfigured()) {
-      System.out.println("[DB] POSTGRES_HOST no configurado — omitiendo persistencia en BD.");
+      LOG.info("POSTGRES_HOST no configurado — omitiendo persistencia en BD.");
       return;
     }
 
@@ -49,10 +53,10 @@ public class PostgresWriter {
       try (Connection conn = DriverManager.getConnection(url, user, password)) {
         insertarResultados(conn, producto, resultados);
         insertarStats(conn, producto, stats);
-        System.out.printf("[DB] Guardados %d resultados para '%s'%n", resultados.size(), producto);
+        LOG.info("Guardados {} resultados para '{}'", resultados.size(), producto);
       }
     } catch (SQLException e) {
-      System.err.println("[DB ERROR] " + e.getMessage());
+      LOG.error("Error al guardar en BD: {}", e.getMessage());
     }
   }
 
